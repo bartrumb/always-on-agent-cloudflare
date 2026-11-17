@@ -24,6 +24,11 @@ export type Props = Record<string, unknown>;
 
 // Sends one event to PostHog's capture endpoint. Never throws: analytics failing must
 // not break the agent, so errors are logged and swallowed.
+// Lesson learned: fetch() only rejects when the network fails. A 400 or 401 from
+// PostHog (a bad key, a malformed event) is a normal response, so without checking
+// res.ok it vanished silently. Now it's a line in Workers Logs, next to its trace.
+// Note: PostHog may still answer 200 for a key it drops later, so the PostHog
+// Activity view remains the final check that events arrive.
 export function capture(env: Env, event: string, distinctId: string, properties: Props = {}): Promise<void> {
   if (!env.POSTHOG_KEY) return Promise.resolve();
   return fetch(`${env.POSTHOG_HOST}/i/v0/e/`, {
@@ -37,7 +42,9 @@ export function capture(env: Env, event: string, distinctId: string, properties:
       timestamp: new Date().toISOString()
     })
   })
-    .then(() => undefined)
+    .then(async (res) => {
+      if (!res.ok) console.error(`[posthog] capture rejected: ${event} -> HTTP ${res.status}`, (await res.text()).slice(0, 200));
+    })
     .catch((err) => console.error("[posthog] capture failed", err));
 }
 

@@ -224,3 +224,7 @@ The idea, and every project this demo is built on.
 - [PostHog/posthog-js](https://github.com/PostHog/posthog-js) and [PostHog LLM analytics](https://posthog.com/docs/llm-analytics): usage, replays and errors
 - Product icons: [cloudflare/cloudflare-docs](https://github.com/cloudflare/cloudflare-docs/tree/production/src/icons), CC BY 4.0
 - Type: [Atkinson Hyperlegible Next](https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next) and [Big Shoulders Stencil](https://fonts.google.com/specimen/Big+Shoulders+Stencil)
+
+## License
+
+MIT, see [LICENSE](LICENSE). The Cloudflare product icons in `docs/icons` are from the Cloudflare docs and stay under CC BY 4.0.

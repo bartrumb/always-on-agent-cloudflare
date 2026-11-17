@@ -1,0 +1,21 @@
+flowchart LR
+  subgraph sources["Event sources"]
+    W["Webhook, email, chat"]
+    H["Human approval"]
+  end
+  W -- "POST /events/:user" --> F["Worker<br/>fast ack"]
+  H -- "POST /approvals/:user/:id" --> F
+  F -- "RPC" --> I
+
+  subgraph agent["Assistant: one Durable Object per user"]
+    direction TB
+    I[("Inbox<br/>Think submissions<br/>dedupe by event id")] --> R["Run<br/>Claude Haiku 5.5 + tools"]
+    R <--> M[("Memory<br/>Sessions + context block")]
+    R -- "risky action" --> P[("Paused action<br/>run ends")]
+    P -- "approveExecution" --> R
+    R -- "schedule_follow_up" --> T[("Timer<br/>DO alarm")]
+    T -- "fires as new event" --> I
+    R -- "send_message" --> O[("Outbox table")]
+  end
+  O -- "alarm dispatcher, retries" --> X["Log or webhook"]
+  R -- "runWorkflow" --> WF["ReleaseWorkflow<br/>long multi-step job"]

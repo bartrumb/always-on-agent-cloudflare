@@ -26,28 +26,12 @@ npm run demo        # or: scripted end-to-end run with checks; no API key needed
 | **Permissions**: risky actions wait for a human | A `kind: "durable-pause"` action. The run *ends*; nothing waits in memory. `approveExecution()` later runs the action and continues the conversation. | `issue_refund`, `Assistant.decide()` |
 | **Outbox**: side effects leave through one door, once | *Not in Think, so it lives here:* an `app_outbox` table keyed by idempotency key, delivered on the alarm with retries (log or webhook) | `enqueueOutbox()`, `dispatchOutbox()` |
 
-```mermaid
-flowchart LR
-  subgraph sources [Event sources]
-    W[Webhook / email / chat]
-    H[Human approval]
-  end
-  W -- POST /events/:user --> F[Worker<br/>fast ack]
-  H -- POST /approvals/:user/:id --> F
-  F -- RPC --> A
+![Architecture: event sources reach a Worker, which hands events to one Durable Object per user. Inside it, the inbox feeds runs; runs use memory, pause risky actions for approval, set timers that fire back into the inbox, and send through the outbox. Runs can also start a long Workflow.](public/architecture.png)
 
-  subgraph A [Assistant: one Durable Object per user]
-    direction TB
-    I[(Inbox<br/>Think submissions<br/>dedupe by event id)] --> R[Run<br/>Claude + tools]
-    R <--> M[(Memory<br/>Sessions + context block)]
-    R -- risky action --> P[(Paused action<br/>run ends)]
-    P -- approveExecution --> R
-    R -- schedule_follow_up --> T[(Timer<br/>DO alarm)]
-    T -- fires as new event --> I
-    R -- send_message --> O[(Outbox table)]
-  end
-  O -- alarm dispatcher, retries --> X[Log / webhook]
-  A -- runWorkflow --> WF[ReleaseWorkflow<br/>long multi-step job]
+The diagram is drawn from [`docs/architecture.mmd`](docs/architecture.mmd). To redraw it after editing:
+
+```bash
+npx -p @mermaid-js/mermaid-cli@12.2.0 mmdc -i docs/architecture.mmd -o public/architecture.png -c docs/mermaid.config.json -b white --size 3000
 ```
 
 ## What the demo shows
@@ -163,6 +147,7 @@ src/release-workflow.ts  ReleaseWorkflow (ThinkWorkflow): deploy-safety demo
 src/mock-model.ts        scripted model for keyless runs
 src/telemetry.ts         PostHog capture (LLM generations, errors)
 public/index.html        one-page UI
+public/architecture.png  architecture diagram (from docs/architecture.mmd)
 scripts/demo.mjs         end-to-end demo and checks
 ```
 

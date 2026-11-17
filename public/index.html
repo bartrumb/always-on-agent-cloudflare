@@ -154,6 +154,9 @@
   table { width: 100%; border-collapse: collapse; background: var(--paper); border-radius: 4px; overflow: hidden; font-size: 15px; }
   th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
   th { font-weight: 800; }
+  .arch { margin: 0 0 18px; background: #fff; border-radius: 4px; padding: 12px; border: 1px solid var(--rule); }
+  .arch img { display: block; width: 100%; height: auto; }
+  .arch figcaption { margin-top: 8px; font-size: 14px; color: #6d6d6f; }
   .sources { margin-top: 56px; }
   .sources h2 { margin: 0 0 4px; font-size: 24px; }
   .sources > p { margin: 0 0 14px; color: var(--soft); }
@@ -357,6 +360,11 @@
   <section class="map">
     <h2>The grown-up version</h2>
     <p>Each part of the article, and the Cloudflare piece that does it.</p>
+    <figure class="arch">
+      <a href="/architecture.png" target="_blank" rel="noopener"><img src="/architecture.png" width="1500" height="508" loading="lazy"
+        alt="Architecture: event sources reach a Worker, which hands events to one Durable Object per user. Inside it, the inbox feeds runs; runs use memory, pause risky actions for approval, set timers that fire back into the inbox, and send through the outbox. Runs can also start a long Workflow."></a>
+      <figcaption>How the pieces connect. Open the image for full size.</figcaption>
+    </figure>
     <div class="table-wrap">
     <table>
       <thead><tr><th>Article</th><th>On this desk</th><th>Cloudflare</th></tr></thead>

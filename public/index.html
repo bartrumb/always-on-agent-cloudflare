@@ -636,6 +636,8 @@ const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el
 const where = (box, html) => `<span class="step-detail"><span class="where">${box}:</span>${html}</span>`;
 const working = (c) => c.L?.status === "running" || (snap?.workingOn && snap.workingOn === c.L?.requestId);
 const busyNote = `<span class="step-detail"><span class="working-dot" aria-hidden="true"></span>The helper is working on it now.</span>`;
+// A refund may come without an amount (the approver confirms it).
+const refundText = (i, lead = "Refund") => `${lead}${i?.amountUsd ? ` of $${esc(i.amountUsd)}` : ""} for order ${esc(i?.orderId)}`;
 const quote = (s) => `“${esc(untag(s))}”`;
 const countdown = (a) => {
   const at = a.at < 1e12 ? a.at * 1000 : a.at; const secs = Math.max(0, Math.round((at - serverNow()) / 1000));
@@ -653,7 +655,7 @@ const TESTS = [
       { label: "The helper reads it and fills in a refund form for you to sign", done: (c) => !!c.approval || !!c.out || c.saidNo,
         busy: (c) => working(c) && !c.approval,
         detail: (c) => c.approval
-          ? where("Needs your signature", ` Refund $${esc(c.approval.input?.amountUsd)} for order ${esc(c.approval.input?.orderId)}. The helper went to sleep instead of waiting.`)
+          ? where("Needs your signature", ` ${refundText(c.approval.input)}. The helper went to sleep instead of waiting.`)
           : where("Needs your signature", ` ${esc(c.run.form ?? "the form")}, ${c.saidNo ? "turned down" : "now signed and filed"}.`) },
       { label: "You sign it, or say no", done: (c) => c.signedIt || c.saidNo || !!c.out,
         action: (c) => c.approval ? where("Your turn", ` sign the form to wake the helper.
@@ -709,7 +711,7 @@ function testContext(t, s, lt) {
   const child = req ? lt.list.find((x) => x.causedBy === req) : null;
   const childOut = child?.requestId ? s.outbox.find((m) => m.requestId === child.requestId) : null;
   const alarm = req ? s.alarms.find((a) => a.from === req) : null;
-  if (approval && !run.form) { run.form = `Refund $${approval.input?.amountUsd} for order ${approval.input?.orderId}`; save("runs", runs); }
+  if (approval && !run.form) { run.form = refundText(approval.input); save("runs", runs); }
   const declinedOut = outs.find((m) => m.key.startsWith("declined:"));
   const saidNo = !approval && (declined.has(run.submissionId) || !!declinedOut);
   return { run, L, approval, outs, out, child, childOut, alarm, declinedOut, saidNo, signedIt: !approval && !saidNo && signed.has(run.submissionId) };
@@ -830,7 +832,7 @@ function chatItems(s, lt) {
   }
   for (const p of s.pendingApprovals) {
     const L = lt.byReq.get(p.requestId); const i = p.input || {};
-    const what = p.action === "issue_refund" ? `a refund of $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
+    const what = p.action === "issue_refund" ? refundText(i, "a refund") : esc(friendly[p.action] ?? p.action);
     items.push({ t: (L?.createdAt ?? serverNow()) + 1, key: "sign:" + p.executionId, unread: true, html:
       `<div class="msg helper ask">${L ? tag(L.n, "About letter " + L.n) : ""}
         <p>I need your signature before I can issue ${what}. I'm going to sleep until you decide.</p>
@@ -1001,7 +1003,7 @@ function render(s) {
   save("refundOf", refundOf);
   put("approvals", s.pendingApprovals.length ? s.pendingApprovals.map((p) => {
     const L = lt.byReq.get(p.requestId); const i = p.input || {};
-    const what = p.action === "issue_refund" ? `Refund $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
+    const what = p.action === "issue_refund" ? refundText(i) : esc(friendly[p.action] ?? p.action);
     return `<li class="sheet" tabindex="0"${L ? ` data-root="${L.root}"` : ""}>${tag(L?.n, L ? "From letter " + L.n : null)}<br>${what}<small>Risk: ${esc(p.risk ?? "unknown")}</small>${stamp("sign:" + p.executionId, "Sign here")}
       <div class="row" style="margin-top:8px"><button class="sign" onclick="decide('${esc(p.executionId)}', true, '${esc(L?.id ?? "")}')">Sign it</button>
       <button class="no" onclick="decide('${esc(p.executionId)}', false, '${esc(L?.id ?? "")}')">Say no</button></div></li>`;

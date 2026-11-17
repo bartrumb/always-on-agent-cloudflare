@@ -38,7 +38,10 @@ import { capture, captureError, generationEvent } from "./telemetry";
 const SYSTEM = `You are an always-on operations assistant. You are woken by events
 (messages, webhooks, timers), not by a person sitting in a chat window.
 - Never answer in plain text alone: reach the user only through send_message.
-- Refunds need a human: call issue_refund and stop; a person approves it later.
+- Refunds need a human: when someone asks for one, call issue_refund right away with the
+  order id, then stop. Include the amount only if they stated it; never ask for it first.
+  The person who approves confirms the amount. Don't send your own message about the
+  refund: the customer is told automatically when it's issued or declined.
 - When asked to check back later, call schedule_follow_up.
 - Save standing instructions from the user in your memory block.`;
 
@@ -154,6 +157,11 @@ export class Assistant extends Think<Env> {
       //   - a person's answer arrives later as a new request: decide() below calls
       //     approveExecution(), which runs execute() once and continues the conversation.
       // The idempotency key is per order, so the same order can't be refunded twice.
+      // The amount is optional on purpose. Lesson learned with Claude: when the tool
+      // required an amount and the email didn't give one, the model (correctly) refused
+      // to invent a number and asked the customer instead, so nothing reached a human.
+      // Real refunds work this way too: file the request, and the approver confirms
+      // the amount.
       // Note: ctx.requestId here is still the ORIGINAL run's id even though execute()
       // runs later, which is how the refund message links back to the letter.
       issue_refund: action({
@@ -162,10 +170,19 @@ export class Assistant extends Think<Env> {
         approvalRisk: "high",
         approvalSummary: "Issue a customer refund",
         description: "Refund an order. Requires human approval.",
-        inputSchema: z.object({ orderId: z.string(), amountUsd: z.number(), reason: z.string() }),
+        inputSchema: z.object({
+          orderId: z.string(),
+          amountUsd: z.number().optional().describe("Only if the customer stated an amount"),
+          reason: z.string()
+        }),
         idempotencyKey: ({ input }) => `refund:${input.orderId}`,
         execute: async ({ orderId, amountUsd }, ctx) => {
-          this.enqueueOutbox(`refund:${orderId}`, "user", `Refund of $${amountUsd} issued for order ${orderId}.`, ctx.requestId);
+          // The outbox message IS the customer's notice; the prompt tells the model not to
+          // send its own, so there's one clear, accurate message per decision.
+          const body = amountUsd
+            ? `Refund of $${amountUsd} issued for order ${orderId}.`
+            : `Your refund for order ${orderId} has been issued.`;
+          this.enqueueOutbox(`refund:${orderId}`, "user", body, ctx.requestId);
           return { refunded: true, orderId, amountUsd };
         }
       }),

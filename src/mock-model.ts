@@ -28,6 +28,8 @@ function text(t: string): Part[] {
 function decide(prompt: Array<{ role: string; content: unknown }>): { parts: Part[]; reason: string } {
   const { role, text: msg } = lastMessage(prompt);
   if (role === "tool") return { parts: text("Done."), reason: "stop" };
+  // Think's automatic nudge after an approval: nothing new to say.
+  if (/^continue your previous response/i.test(msg.trim())) return { parts: text("Done."), reason: "stop" };
   const lower = msg.toLowerCase();
   const order = /order\s+#?(\w+)/i.exec(msg)?.[1] ?? "unknown";
   if (lower.includes("timer fired"))
@@ -35,7 +37,7 @@ function decide(prompt: Array<{ role: string; content: unknown }>): { parts: Par
   if (lower.includes("refund"))
     return { parts: toolCall("issue_refund", { orderId: order, amountUsd: 40, reason: msg }), reason: "tool-calls" };
   if (lower.includes("remind"))
-    return { parts: toolCall("schedule_follow_up", { seconds: 5, note: msg }), reason: "tool-calls" };
+    return { parts: toolCall("schedule_follow_up", { seconds: Number(/(\d+)\s*sec/i.exec(msg)?.[1] ?? 5), note: msg }), reason: "tool-calls" };
   if (lower.includes("release notes"))
     return { parts: text("Release notes: faster inbox, safer approvals."), reason: "stop" };
   return {

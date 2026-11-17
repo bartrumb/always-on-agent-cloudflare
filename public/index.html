@@ -165,7 +165,40 @@
   footer { margin-top: 40px; color: var(--soft); font-size: 14px; max-width: 70ch; }
   footer p { margin: 0 0 8px; }
 
+  /* Guided tests */
+  .tests { margin-top: 48px; }
+  .tests h2 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.01em; }
+  .tests > p { margin: 0 0 16px; color: var(--soft); max-width: 60ch; }
+  .tgrid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .test { background: var(--paper); border-radius: 4px; padding: 18px; border-left: 5px solid var(--orange); display: flex; flex-direction: column; }
+  .test h3 { margin: 0 0 4px; font-size: 19px; }
+  .test .proves { margin: 0 0 12px; font-size: 15px; }
+  .test .proves b { font-weight: 800; }
+  .test .letter { margin: 0 0 12px; padding: 8px 10px; background: var(--desk); border-radius: 3px; font-size: 15px; }
+  .test .letter small { display: block; color: var(--soft); font-size: 13px; }
+  .steps { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+  .steps li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; font-size: 15px; color: var(--soft); }
+  .steps li .box { width: 20px; height: 20px; margin-top: 2px; }
+  .steps li.done { color: var(--ink); }
+  .steps li.done .box::after { content: "✓"; }
+  .steps li.now { color: var(--ink); font-weight: 600; }
+  .steps li.now .box { border-color: var(--orange); background: color-mix(in srgb, var(--orange) 18%, transparent); }
+  .steps .hint { display: block; font-weight: 400; color: var(--soft); font-size: 14px; }
+  .test .row { margin-top: auto; }
+  .verdict { font-size: 14px; margin-left: 4px; }
+  .verdict.ok { color: var(--green); font-weight: 700; }
+
+  /* Letter tags and tracing across boxes */
+  .tag { display: inline-block; font-size: 12px; font-weight: 800; padding: 0 7px; border-radius: 999px; background: var(--orange); color: var(--on-orange); margin-right: 6px; vertical-align: 1px; }
+  .tag.ghost { background: transparent; color: var(--soft); border: 1px solid var(--rule); font-weight: 600; }
+  .quote { display: block; font-style: italic; margin-top: 2px; }
+  [data-root] { transition: opacity .15s, box-shadow .15s; }
+  body.tracing [data-root]:not(.lit) { opacity: .35; }
+  .lit { box-shadow: 0 0 0 2px var(--orange); }
+  @media (prefers-reduced-motion: reduce) { [data-root] { transition: none; } }
+
   @media (max-width: 900px) {
+    .tgrid { grid-template-columns: 1fr; }
     .hero, .log, .chore, .sources .cols { grid-template-columns: 1fr; }
     .desk { grid-template-columns: 1fr 1fr; }
   }
@@ -188,7 +221,7 @@
         happening: an email arrives, an alarm rings, a person says yes. Between jobs it sleeps and costs nothing.</p>
       <p class="small">It's a working copy of Anthropic's
         <a href="https://claude.com/resources/articles/building-always-on-agents" target="_blank" rel="noopener">Building always-on agents</a>,
-        running on Cloudflare. Drop something in its inbox and watch its desk below.
+        running on Cloudflare. Run one of the tests below and watch the helper's desk.
         <a href="https://github.com/bartrumb/always-on-agent-cloudflare" target="_blank" rel="noopener">Read the code on GitHub</a>.</p>
       <div class="meta">
         <span>Your helper: <b id="sid"></b></span>
@@ -198,15 +231,10 @@
     </div>
 
     <form class="slot" id="slotForm">
-      <h2>Drop something in the inbox</h2>
-      <p>This is what a webhook does: it hands over a letter and leaves. The reply comes later.</p>
+      <h2>Or write your own letter</h2>
+      <p>This is what a webhook does: it hands over a letter and leaves. The reply comes later, through the outbox.</p>
       <label class="lbl" for="text">The letter</label>
-      <textarea id="text" maxlength="500">Please refund order #A100, it arrived broken</textarea>
-      <div class="fills" aria-label="Example letters">
-        <button type="button" class="chip" data-fill="Please refund order #A100, it arrived broken">Ask for a refund</button>
-        <button type="button" class="chip" data-fill="Remind me to check the shipment in a minute">Ask for a reminder</button>
-        <button type="button" class="chip" data-fill="From now on, keep every reply to one short sentence">Give a standing rule</button>
-      </div>
+      <textarea id="text" maxlength="500" placeholder="Try: Please refund order #B200, it never arrived">Hi, is my order on its way?</textarea>
       <div class="row">
         <label class="lbl" for="source" style="margin:0">From</label>
         <select id="source"><option value="email">Email</option><option value="chat">Chat</option><option value="webhook">Webhook</option></select>
@@ -217,9 +245,16 @@
     </form>
   </section>
 
+  <section class="tests" aria-labelledby="tests-h">
+    <h2 id="tests-h">Run a test</h2>
+    <p>Each test sends one letter and checks off what should happen, live, as the desk below changes.
+      Hover over or tab to any item on the desk to light up everything that came from the same letter.</p>
+    <div class="tgrid" id="tests"></div>
+  </section>
+
   <div class="desk-head">
     <h2>The helper's desk</h2>
-    <p>Everything here is saved, so it survives restarts, deploys and days of waiting.</p>
+    <p>Every letter gets a number. Everything it causes, in any box, carries that number.</p>
   </div>
 
   <section class="desk">
@@ -235,6 +270,7 @@
     <div class="obj helper" id="helper">
       <h3>The helper</h3>
       <div class="lamp"><span class="bulb" aria-hidden="true"></span><span id="lampText">Asleep</span></div>
+      <p class="eli5" id="lampWhat" style="margin-top:-6px"></p>
       <p class="eli5">It picks up one ticket, reads its notebook, decides what to do, uses its tools, and goes back to sleep. Nobody has to keep a window open.</p>
       <p class="model" id="modelNote"></p>
       <details><summary>How it's built</summary>
@@ -380,13 +416,17 @@ const $ = (id) => document.getElementById(id);
 const untag = (s) => String(s ?? "").replace(/\[(email|chat|webhook|timer)\]\s*/g, "");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const load = (k, d) => { try { return JSON.parse(store.get(k + ":" + sid) || "null") ?? d; } catch { return d; } };
+const save = (k, v) => store.set(k + ":" + sid, JSON.stringify(v));
 const newId = () => "s-" + crypto.randomUUID().slice(0, 12);
 let sid = store.get("sid") || newId(); store.set("sid", sid);
-let lastEvent = null, relId = store.get("rel:" + sid);
 $("sid").textContent = sid;
 
-// PostHog: traffic, session replay and front-end errors. Loads only when the Worker has a
-// project token. The helper id is the distinct id, so replays line up with LLM traces.
+// Per-helper memory of what this browser did (tests run, duplicates seen, refunds signed).
+let runs = load("runs", {}), dupKeys = new Set(load("dups", [])), signed = new Set(load("signed", []));
+let lastEvent = null, relId = store.get("rel:" + sid), prev = null, snap = null;
+
+// ---- PostHog (only when the Worker has a project token) --------------------------
 let ph = null;
 fetch("/config").then((r) => r.json()).then((cfg) => {
   if (!cfg.posthogKey) return;
@@ -409,143 +449,276 @@ async function api(method, path, body) {
   return data;
 }
 
-// ---- The story feed ---------------------------------------------------------
+// ---- Story feed -------------------------------------------------------------
 const said = [];
 function say(text) {
   const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
   said.unshift(`<li><time>${t}</time>${text}</li>`);
-  $("story").innerHTML = said.slice(0, 12).join("");
+  $("story").innerHTML = said.slice(0, 14).join("");
 }
-function storyEmpty() { if (!said.length) $("story").innerHTML = `<li>Nothing yet. Drop a letter in the inbox to wake the helper.</li>`; }
+function storyEmpty() { if (!said.length) $("story").innerHTML = `<li>Nothing yet. Run a test above to wake the helper.</li>`; }
 
-// ---- Stamps: thunk only the first time something appears -------------------
-const seen = new Set(store.get("seen:" + sid) ? JSON.parse(store.get("seen:" + sid)) : []);
+// ---- Stamps: thunk only the first time something appears ----------------------
+const seen = new Set(load("seen", []));
 let firstPaint = true;
 function stamp(key, word, green) {
   const fresh = !seen.has(key);
-  if (fresh) { seen.add(key); store.set("seen:" + sid, JSON.stringify([...seen].slice(-200))); }
+  if (fresh) { seen.add(key); save("seen", [...seen].slice(-300)); }
   return `<span class="stamp${green ? " g" : ""}${fresh && !firstPaint ? " thunk" : ""}">${word}</span>`;
 }
 
-// ---- Send ----------------------------------------------------------------------
+// ---- Letters: number every submission and trace what it caused -----------------
+// n = letter number (by arrival). root = the letter a chain started from
+// (a timer's letter belongs to the letter that set the timer).
+function letters(s) {
+  const subs = [...s.submissions].sort((a, b) => a.createdAt - b.createdAt);
+  const byReq = new Map(), byId = new Map();
+  subs.forEach((x, i) => { const L = { ...x, n: i + 1 }; byId.set(x.id, L); if (x.requestId) byReq.set(x.requestId, L); });
+  for (const L of byId.values()) {
+    const parent = L.causedBy ? byReq.get(L.causedBy) : null;
+    L.parent = parent?.n ?? null;
+    let r = L; while (r.causedBy && byReq.get(r.causedBy)) r = byReq.get(r.causedBy);
+    L.root = r.n;
+  }
+  return { list: [...byId.values()], byReq, byId };
+}
+// Refunds are approved later; remember which letter asked for each order.
+let refundOf = load("refundOf", {});
+
+const tag = (n, label) => (n ? `<span class="tag">${label ?? "Letter " + n}</span>` : "");
+const friendly = { issue_refund: "Refund", send_message: "Send a message", schedule_follow_up: "Set an alarm" };
+const empty = (t) => `<li class="empty">${t}</li>`;
+const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+
+// ---- Guided tests ---------------------------------------------------------------
+const TESTS = [
+  {
+    id: "refund", title: "A risky job waits for a person",
+    proves: "<b>Permissions.</b> The helper stops and sleeps until someone signs, then finishes the job.",
+    letter: () => ({ source: "email", text: `Please refund order #A${100 + Math.floor(Math.random() * 900)}, it arrived broken` }),
+    steps: [
+      ["The letter gets a ticket in the Inbox tray", (c) => !!c.L],
+      ["The helper asks for a signature in the yellow folder, then goes to sleep", (c) => !!c.approval || !!c.out],
+      ["You sign it", (c) => c.signedIt || !!c.out, "Your turn: click Sign it in the yellow Needs your signature folder."],
+      ["The refund message goes out through the Outbox tray", (c) => c.out?.status === "sent"]
+    ]
+  },
+  {
+    id: "dup", title: "The same email arrives twice",
+    proves: "<b>Event inbox.</b> Webhooks retry. The helper must notice and act only once.",
+    letter: () => ({ source: "email", text: "Hi, is my order on its way?" }),
+    twice: true,
+    steps: [
+      ["The first copy gets a ticket", (c) => !!c.L],
+      ["The second copy is recognized and stamped Duplicate", (c) => c.run.dupIgnored === true],
+      ["Exactly one reply goes out through the Outbox tray", (c) => c.outs.length === 1 && c.outs[0].status === "sent"]
+    ]
+  },
+  {
+    id: "remind", title: "Check back later",
+    proves: "<b>Timers.</b> The helper sets an alarm and sleeps. The alarm wakes it with a new letter.",
+    letter: () => ({ source: "chat", text: "Remind me to check the shipment in 15 seconds" }),
+    steps: [
+      ["The letter gets a ticket", (c) => !!c.L],
+      ["The helper sets an alarm in Alarm clocks, then sleeps", (c) => c.alarm || !!c.child],
+      ["About 15 seconds later the alarm rings and drops a new letter in the Inbox tray", (c) => !!c.child, "Watch the countdown in Alarm clocks."],
+      ["The follow-up goes out through the Outbox tray", (c) => c.childOut?.status === "sent"]
+    ]
+  }
+];
+
+function testContext(t, s, lt) {
+  const run = runs[t.id]; if (!run) return null;
+  const L = lt.byId.get(run.submissionId);
+  const req = L?.requestId;
+  const approval = req && s.pendingApprovals.find((p) => p.requestId === req);
+  const outs = req ? s.outbox.filter((m) => m.requestId === req) : [];
+  const out = outs.find((m) => m.key.startsWith("refund:")) ?? (t.id === "refund" ? null : outs[0]);
+  const child = req && lt.list.find((x) => x.causedBy === req);
+  const childOut = child?.requestId && s.outbox.find((m) => m.requestId === child.requestId);
+  const alarm = req && s.alarms.some((a) => a.from === req);
+  return { run, L, approval, outs, out, child, childOut, alarm, signedIt: approval ? false : signed.has(run.submissionId) };
+}
+
+function renderTests(s, lt) {
+  put("tests", TESTS.map((t) => {
+    const c = s ? testContext(t, s, lt) : null;
+    let nowSet = false;
+    const items = t.steps.map(([label, check, hint]) => {
+      const done = c ? !!check(c) : false;
+      let cls = done ? "done" : "";
+      if (c && !done && !nowSet) { cls = "now"; nowSet = true; }
+      return `<li class="${cls}"><span class="box"></span><span>${label}${cls === "now" && hint ? `<span class="hint">${hint}</span>` : ""}</span></li>`;
+    }).join("");
+    const allDone = c && t.steps.every(([, check]) => check(c));
+    const letter = c?.L ? `<p class="letter">${tag(c.L.n)}“${esc(untag(c.L.text))}”<small>Sent from ${esc(c.L.source)}</small></p>` : "";
+    return `<article class="test"${c?.L ? ` data-root="${c.L.root}"` : ""}>
+      <h3>${t.title}</h3><p class="proves">${t.proves}</p>${letter}
+      <ol class="steps">${items}</ol>
+      <div class="row"><button class="go" data-test="${t.id}">${c ? "Run it again" : "Run this test"}</button>
+      ${allDone ? `<span class="verdict ok">Passed</span>` : ""}</div></article>`;
+  }).join(""));
+}
+
+async function runTest(id) {
+  const t = TESTS.find((x) => x.id === id);
+  const event = { ...t.letter(), id: crypto.randomUUID().slice(0, 8) };
+  try {
+    const r = await api("POST", `/events/${sid}`, event);
+    runs[id] = { submissionId: r.submissionId };
+    say(`Test started: <b>${t.title.toLowerCase()}</b>. A letter from ${esc(event.source)} landed in the inbox.`);
+    if (t.twice) {
+      await new Promise((ok) => setTimeout(ok, 1200));
+      const again = await api("POST", `/events/${sid}`, event);
+      runs[id].dupIgnored = again.accepted === false && again.submissionId === r.submissionId;
+      if (runs[id].dupIgnored) { dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]); say("The same letter arrived again. Stamped <b>duplicate</b> and ignored."); }
+    }
+    save("runs", runs);
+    track("test_run", { test: id });
+    refresh();
+  } catch (e) { say(esc(e.message)); track("ui_error", { where: "test", message: e.message }); }
+}
+document.addEventListener("click", (e) => { const b = e.target.closest("[data-test]"); if (b) runTest(b.dataset.test); });
+
+// ---- Own letter -------------------------------------------------------------------
 async function send(event) {
   $("ack").textContent = "Dropping it in…";
   try {
     const r = await api("POST", `/events/${sid}`, event);
     lastEvent = event; $("dup").disabled = false;
-    if (r.accepted) {
-      $("ack").textContent = "Got a ticket. The helper will pick it up in a moment.";
-      say(`A letter from ${esc(event.source)} landed in the inbox and got a ticket.`);
-    } else {
+    if (r.accepted) { $("ack").textContent = "Got a ticket. Watch the Inbox tray."; say(`A letter from ${esc(event.source)} landed in the inbox.`); }
+    else {
+      dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]);
       $("ack").textContent = "Same letter as before, so it was stamped Duplicate and ignored.";
-      say(`The same letter arrived again. Stamped <b>duplicate</b> and ignored; nothing will happen twice.`);
-      dupKeys.add(`${event.source}:${event.id}`); saveDups();
+      say("The same letter arrived again. Stamped <b>duplicate</b> and ignored.");
     }
     refresh();
-  } catch (e) {
-    $("ack").textContent = e.message;
-    track("ui_error", { where: "send", message: e.message });
-  }
+  } catch (e) { $("ack").textContent = e.message; track("ui_error", { where: "send", message: e.message }); }
 }
-const dupKeys = new Set(JSON.parse(store.get("dups:" + sid) || "[]"));
-const saveDups = () => store.set("dups:" + sid, JSON.stringify([...dupKeys]));
 $("slotForm").onsubmit = (e) => { e.preventDefault(); send({ source: $("source").value, id: crypto.randomUUID().slice(0, 8), text: $("text").value }); };
 $("dup").onclick = () => lastEvent && send(lastEvent);
-document.querySelectorAll("[data-fill]").forEach((b) => (b.onclick = () => { $("text").value = b.dataset.fill; $("text").focus(); }));
 $("reset").onclick = () => {
-  sid = newId(); store.set("sid", sid); relId = null; $("sid").textContent = sid; $("ack").textContent = "";
-  said.length = 0; seen.clear(); dupKeys.clear(); prev = null; firstPaint = true; storyEmpty();
-  if (ph) { ph.reset(); ph.identify(sid); }
+  sid = newId(); store.set("sid", sid); $("sid").textContent = sid; $("ack").textContent = "";
+  relId = null; prev = null; firstPaint = true; said.length = 0; seen.clear();
+  runs = {}; dupKeys = new Set(); signed = new Set(); refundOf = {};
+  storyEmpty(); if (ph) { ph.reset(); ph.identify(sid); }
   refresh();
 };
 
-async function decide(id, approve) {
+async function decide(id, approve, subId) {
   try {
     await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
+    if (subId) { signed.add(subId); save("signed", [...signed]); }
     say(approve ? "You signed. The helper woke up to finish the job." : "You said no. The helper woke up and dropped the job.");
   } catch (e) { say(esc(e.message)); }
   refresh();
 }
 window.decide = decide;
 
-// ---- Render the desk -------------------------------------------------------------
-const friendly = { issue_refund: "Refund", send_message: "Send a message", schedule_follow_up: "Set an alarm" };
-const empty = (t) => `<li class="empty">${t}</li>`;
-// Redraw a panel only when its content changed, so focus and clicks aren't lost.
-const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
-let prev = null;
-
-function narrate(s) {
+// ---- Narration ------------------------------------------------------------------------
+function narrate(s, lt) {
   if (!prev) return;
   const was = new Map(prev.submissions.map((x) => [x.id, x.status]));
-  for (const x of s.submissions) {
-    const before = was.get(x.id);
-    if (!before && x.key?.startsWith("timer:")) say("An alarm rang. It became a new letter in the inbox.");
-    if (before !== "running" && x.status === "running") say("The helper woke up and started on a ticket.");
-    if (before && before !== "completed" && x.status === "completed") say("Ticket done. The helper went back to sleep.");
+  for (const L of lt.list) {
+    const before = was.get(L.id);
+    if (!before && L.parent) say(`An alarm set by letter ${L.parent} rang. It became <b>letter ${L.n}</b> in the inbox.`);
+    if (before !== "running" && L.status === "running") say(`The helper woke up and started on letter ${L.n}.`);
+    if (before && before !== "completed" && L.status === "completed") say(`Letter ${L.n} done. The helper went back to sleep.`);
   }
   const oldA = new Set(prev.pendingApprovals.map((p) => p.executionId));
-  for (const p of s.pendingApprovals) if (!oldA.has(p.executionId))
-    say(`The helper wants your signature for a <b>${esc(friendly[p.action] ?? p.action)}</b>, and went to sleep instead of waiting.`);
+  for (const p of s.pendingApprovals) if (!oldA.has(p.executionId)) {
+    const n = lt.byReq.get(p.requestId)?.n;
+    say(`Letter ${n ?? "?"} needs your signature for a <b>${esc(friendly[p.action] ?? p.action)}</b>. The helper went to sleep instead of waiting.`);
+  }
   const oldO = new Set(prev.outbox.filter((m) => m.status === "sent").map((m) => m.key));
-  for (const m of s.outbox) if (m.status === "sent" && !oldO.has(m.key)) say(`The mail carrier delivered: “${esc(untag(m.body))}”`);
+  for (const m of s.outbox) if (m.status === "sent" && !oldO.has(m.key)) {
+    const n = lt.byReq.get(m.requestId)?.n ?? refundOf[m.key];
+    say(`The outbox delivered${n ? ` a reply to letter ${n}` : ""}: “${esc(untag(m.body))}”`);
+  }
   const oldC = new Set(prev.alarms.map((a) => a.id));
-  for (const a of s.alarms) if (!oldC.has(a.id)) say("The helper set an alarm to check back later.");
+  for (const a of s.alarms) if (!oldC.has(a.id)) say(`Letter ${lt.byReq.get(a.from)?.n ?? "?"} asked to check back later, so the helper set an alarm.`);
 }
 
-function ticketLabel(x) {
-  if (x.key?.startsWith("timer:")) return "Alarm rang";
-  const src = (x.key ?? "").split(":")[0];
-  return src ? `Letter from ${src}` : "Letter";
-}
-
+// ---- Render the desk -------------------------------------------------------------------
 function render(s) {
-  narrate(s);
+  const lt = letters(s);
+  narrate(s, lt);
+  snap = s;
   $("model").textContent = s.model === "claude-haiku-5-5" ? "Claude Haiku 5.5" : "a practice script (no AI key set)";
   $("modelNote").textContent = s.model === "claude-haiku-5-5"
     ? "Thinking with Claude Haiku 5.5, the smallest, cheapest Claude."
-    : "Right now it follows a practice script instead of calling Claude, so it's free.";
-  const helper = $("helper"); helper.classList.toggle("on", !!s.busy);
+    : "Right now it follows a practice script instead of calling Claude, so it's free and quick. Every box works the same way it would with Claude.";
+  const working = s.workingOn ? lt.byReq.get(s.workingOn) : null;
+  $("helper").classList.toggle("on", !!s.busy);
   $("lampText").textContent = s.busy ? "Working" : "Asleep";
+  $("lampWhat").innerHTML = s.busy ? (working ? `On ${tag(working.n)}` : "Finishing a job") : "Waiting for the next letter, using no compute.";
 
-  const statusWord = { pending: "Waiting", running: "Working", completed: "Done", error: "Failed", aborted: "Cancelled", skipped: "Skipped" };
-  put("inbox", s.submissions.length ? s.submissions.slice(0, 6).map((x) => {
-    const done = x.status === "completed";
-    const st = dupKeys.has(x.key) ? stamp("dup:" + x.key, "Duplicate") : done ? stamp("done:" + x.id, "Done", true) : "";
-    return `<li class="sheet">${esc(ticketLabel(x))}<small>${esc(statusWord[x.status] ?? x.status)}, ticket ${esc(x.id.slice(0, 6))}</small>${st}</li>`;
-  }).join("") : empty("Empty. Drop a letter in to wake the helper."));
+  const statusWord = { pending: "Waiting its turn", running: "Being worked on", completed: "Done", error: "Failed", aborted: "Cancelled", skipped: "Skipped" };
+  const newest = [...lt.list].reverse().slice(0, 8);
+  put("inbox", newest.length ? newest.map((L) => {
+    const st = dupKeys.has(L.key) ? stamp("dup:" + L.key, "Duplicate") : L.status === "completed" ? stamp("done:" + L.id, "Done", true) : "";
+    const from = L.parent ? `From the alarm set by letter ${L.parent}` : `From ${esc(L.source ?? "?")}`;
+    return `<li class="sheet" tabindex="0" data-root="${L.root}">${tag(L.n)}<small style="display:inline">${from}</small>
+      <span class="quote">“${esc(untag(L.text ?? ""))}”</span><small>${esc(statusWord[L.status] ?? L.status)}</small>${st}</li>`;
+  }).join("") : empty("Empty. Run a test above to send the first letter."));
 
+  for (const p of s.pendingApprovals) if (p.action === "issue_refund") {
+    const n = lt.byReq.get(p.requestId)?.n; if (n) refundOf["refund:" + p.input?.orderId] = n;
+  }
+  save("refundOf", refundOf);
   put("approvals", s.pendingApprovals.length ? s.pendingApprovals.map((p) => {
-    const i = p.input || {};
+    const L = lt.byReq.get(p.requestId); const i = p.input || {};
     const what = p.action === "issue_refund" ? `Refund $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
-    return `<li class="sheet">${what}<small>Risk: ${esc(p.risk ?? "unknown")}</small>${stamp("sign:" + p.executionId, "Sign here")}
-      <div class="row" style="margin-top:8px"><button class="sign" onclick="decide('${esc(p.executionId)}', true)">Sign it</button>
-      <button class="no" onclick="decide('${esc(p.executionId)}', false)">Say no</button></div></li>`;
-  }).join("") : empty("Nothing to sign. Ask for a refund to fill this folder."));
+    return `<li class="sheet" tabindex="0"${L ? ` data-root="${L.root}"` : ""}>${tag(L?.n, L ? "From letter " + L.n : null)}<br>${what}<small>Risk: ${esc(p.risk ?? "unknown")}</small>${stamp("sign:" + p.executionId, "Sign here")}
+      <div class="row" style="margin-top:8px"><button class="sign" onclick="decide('${esc(p.executionId)}', true, '${esc(L?.id ?? "")}')">Sign it</button>
+      <button class="no" onclick="decide('${esc(p.executionId)}', false, '${esc(L?.id ?? "")}')">Say no</button></div></li>`;
+  }).join("") : empty("Nothing to sign. The refund test fills this folder."));
 
-  put("outbox", s.outbox.length ? s.outbox.slice(-5).reverse().map((m) =>
-    `<li class="sheet">${esc(untag(m.body))}<small>To: ${esc(m.recipient)}</small>${m.status === "sent" ? stamp("sent:" + m.key, "Sent", true) : stamp("q:" + m.key, "Queued")}</li>`
-  ).join("") : empty("Nothing sent yet. The helper only speaks through here."));
+  put("outbox", s.outbox.length ? s.outbox.slice(-6).reverse().map((m) => {
+    const L = lt.byReq.get(m.requestId) ?? lt.list.find((x) => x.n === refundOf[m.key]);
+    return `<li class="sheet" tabindex="0"${L ? ` data-root="${L.root}"` : ""}>${tag(L?.n, L ? "Reply to letter " + L.n : null)}
+      <span class="quote">“${esc(untag(m.body))}”</span><small>To: ${esc(m.recipient)}</small>${m.status === "sent" ? stamp("sent:" + m.key, "Sent", true) : stamp("q:" + m.key, "Queued")}</li>`;
+  }).join("") : empty("Nothing sent yet. Every reply leaves through here."));
 
   put("notebook", s.notebook?.length ? s.notebook.map((n) => {
     const who = n.role === "user" ? "Letter" : "Helper";
     const tools = n.tools?.length ? ` <span class="tool">(used: ${n.tools.map((t) => esc(friendly[t.name] ?? t.name)).join(", ")})</span>` : "";
-    const text = n.text ? esc(untag(n.text)) : "";
-    return `<p class="line"><span class="who">${who}:</span> ${text}${tools}</p>`;
+    return `<p class="line"><span class="who">${who}:</span> ${n.text ? esc(untag(n.text)) : ""}${tools}</p>`;
   }).join("") : `<p class="line" style="color:var(--soft)">Blank page. It fills up as the helper works.</p>`);
 
-  const now = Date.now();
-  put("alarms", s.alarms?.length ? s.alarms.map((a) => {
-    const at = a.at ? (a.at < 1e12 ? a.at * 1000 : a.at) : now;
-    const secs = Math.max(0, Math.round((at - now) / 1000));
-    const mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, "0");
-    return `<div class="clock"><span class="digits">${mm}:${ss}</span><span>${esc(untag(a.note))}</span></div>`;
-  }).join("") : `<p class="empty" style="margin:0">No alarms set. Ask for a reminder to set one.</p>`);
-
+  renderTests(s, lt);
+  paintClocks();
+  if (trace) applyTrace(trace);
   prev = s; firstPaint = false;
 }
 
-// ---- Release chore -----------------------------------------------------------------
+// Alarm countdowns tick every second between status polls.
+function paintClocks() {
+  if (!snap) return;
+  const lt = letters(snap), now = Date.now();
+  put("alarms", snap.alarms?.length ? snap.alarms.map((a) => {
+    const L = lt.byReq.get(a.from);
+    const at = a.at ? (a.at < 1e12 ? a.at * 1000 : a.at) : now;
+    const secs = Math.max(0, Math.round((at - now) / 1000));
+    return `<div class="clock" tabindex="0"${L ? ` data-root="${L.root}"` : ""}><span class="digits">${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}</span>
+      <span>${tag(L?.n, L ? "Set by letter " + L.n : null)}<br>${secs ? "Rings soon" : "Ringing"}: ${esc(untag(a.note))}</span></div>`;
+  }).join("") : `<p class="empty" style="margin:0">No alarms set. The reminder test sets one.</p>`);
+  if (trace) applyTrace(trace);
+}
+setInterval(paintClocks, 1000);
+
+// ---- Tracing: light up everything from one letter, across all boxes -------------------
+let trace = null;
+function applyTrace(root) {
+  document.querySelectorAll("[data-root]").forEach((el) => el.classList.toggle("lit", el.dataset.root === root));
+}
+function setTrace(root) {
+  trace = root; document.body.classList.toggle("tracing", !!root);
+  if (root) applyTrace(root); else document.querySelectorAll(".lit").forEach((el) => el.classList.remove("lit"));
+}
+for (const ev of ["mouseover", "focusin"]) document.addEventListener(ev, (e) => { const el = e.target.closest?.("[data-root]"); setTrace(el ? el.dataset.root : null); });
+
+// ---- Release chore ------------------------------------------------------------------------
 async function refreshRelease() {
   const rows = document.querySelectorAll("#checks li");
   if (!relId) { rows.forEach((li) => (li.className = "")); $("approveRel").disabled = true; $("relStatus").textContent = "Not started."; return; }
@@ -576,10 +749,11 @@ $("approveRel").onclick = async () => {
 };
 
 async function refresh() {
-  try { render(await api("GET", `/status/${sid}`)); } catch {}
+  try { render(await api("GET", `/status/${sid}`)); } catch { renderTests(null); }
   refreshRelease();
 }
 storyEmpty();
+renderTests(null);
 refresh();
 setInterval(() => { if (!document.hidden) refresh(); }, 1500);
 </script>

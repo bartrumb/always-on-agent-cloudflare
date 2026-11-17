@@ -19,7 +19,8 @@ const SYSTEM = `You are an always-on operations assistant. You are woken by even
 - When asked to check back later, call schedule_follow_up.
 - Save standing instructions from the user in your memory block.`;
 
-export type InboundEvent = { source: string; id: string; text: string };
+// causedBy: the run (request id) that led to this event, e.g. the run that set a timer.
+export type InboundEvent = { source: string; id: string; text: string; causedBy?: string };
 
 export class Assistant extends Think<Env> {
   // Claude Haiku 5.5 when a key is set, else the free scripted model.
@@ -84,7 +85,7 @@ export class Assistant extends Think<Env> {
         inputSchema: z.object({ to: z.string(), body: z.string() }),
         idempotencyKey: ({ ctx }) => ctx.toolCallId,
         execute: async ({ to, body }, ctx) => {
-          this.enqueueOutbox(ctx.toolCallId, to, body);
+          this.enqueueOutbox(ctx.toolCallId, to, body, ctx.requestId);
           return { queued: true };
         }
       }),
@@ -98,8 +99,8 @@ export class Assistant extends Think<Env> {
         description: "Refund an order. Requires human approval.",
         inputSchema: z.object({ orderId: z.string(), amountUsd: z.number(), reason: z.string() }),
         idempotencyKey: ({ input }) => `refund:${input.orderId}`,
-        execute: async ({ orderId, amountUsd }) => {
-          this.enqueueOutbox(`refund:${orderId}`, "user", `Refund of $${amountUsd} issued for order ${orderId}.`);
+        execute: async ({ orderId, amountUsd }, ctx) => {
+          this.enqueueOutbox(`refund:${orderId}`, "user", `Refund of $${amountUsd} issued for order ${orderId}.`, ctx.requestId);
           return { refunded: true, orderId, amountUsd };
         }
       }),
@@ -108,8 +109,8 @@ export class Assistant extends Think<Env> {
       schedule_follow_up: action({
         description: "Wake this agent again after a delay to follow up.",
         inputSchema: z.object({ seconds: z.number().int().min(1), note: z.string() }),
-        execute: async ({ seconds, note }) => {
-          const s = await this.schedule(seconds, "followUp", { note });
+        execute: async ({ seconds, note }, ctx) => {
+          const s = await this.schedule(seconds, "followUp", { note, from: ctx.requestId });
           return { scheduled: s.id, inSeconds: seconds };
         }
       })
@@ -122,15 +123,15 @@ export class Assistant extends Think<Env> {
   async ingest(event: InboundEvent) {
     const r = await this.submitMessages(
       [{ id: crypto.randomUUID(), role: "user", parts: [{ type: "text", text: `[${event.source}] ${event.text}` }] }],
-      { idempotencyKey: `${event.source}:${event.id}`, metadata: { source: event.source } }
+      { idempotencyKey: `${event.source}:${event.id}`, metadata: { source: event.source, text: event.text.slice(0, 300), causedBy: event.causedBy } }
     );
     this.track(capture(this.env, "event_received", this.name, { source: event.source, duplicate: !r.accepted }));
     return { submissionId: r.submissionId, accepted: r.accepted, status: r.status };
   }
 
   // A timer firing is just another inbox event.
-  async followUp(payload: { note: string }, schedule?: { id: string }) {
-    await this.ingest({ source: "timer", id: schedule?.id ?? crypto.randomUUID(), text: `Timer fired. Follow up on: ${payload.note}` });
+  async followUp(payload: { note: string; from?: string }, schedule?: { id: string }) {
+    await this.ingest({ source: "timer", id: schedule?.id ?? crypto.randomUUID(), text: `Timer fired. Follow up on: ${payload.note}`, causedBy: payload.from });
   }
 
   // ---- Human approval -------------------------------------------------------
@@ -146,16 +147,17 @@ export class Assistant extends Think<Env> {
     this.ctx.storage.sql.exec(`CREATE TABLE IF NOT EXISTS app_outbox (
       key TEXT PRIMARY KEY, recipient TEXT NOT NULL, body TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending', attempts INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL, sent_at INTEGER)`);
+      created_at INTEGER NOT NULL, sent_at INTEGER, request_id TEXT)`);
+    try { this.ctx.storage.sql.exec("ALTER TABLE app_outbox ADD COLUMN request_id TEXT"); } catch { /* already there */ }
     this.outboxReady = true;
   }
 
   // Same key twice (a retried run) is ignored, so a message goes out once.
-  private enqueueOutbox(key: string, recipient: string, body: string) {
+  private enqueueOutbox(key: string, recipient: string, body: string, requestId?: string) {
     this.ensureOutbox();
     this.ctx.storage.sql.exec(
-      "INSERT OR IGNORE INTO app_outbox (key, recipient, body, created_at) VALUES (?, ?, ?, ?)",
-      key, recipient, body, Date.now()
+      "INSERT OR IGNORE INTO app_outbox (key, recipient, body, created_at, request_id) VALUES (?, ?, ?, ?, ?)",
+      key, recipient, body, Date.now(), requestId ?? null
     );
     // Deliver outside the model turn, on the alarm.
     void this.schedule(0, "dispatchOutbox", {});
@@ -198,13 +200,18 @@ export class Assistant extends Think<Env> {
     this.ensureOutbox();
     return {
       model: this.env.ANTHROPIC_API_KEY && this.env.MODEL_MODE !== "mock" ? "claude-haiku-5-5" : "scripted (no API key)",
-      submissions: (await this.listSubmissions()).map((s) => ({ id: s.submissionId, key: s.idempotencyKey, status: s.status })),
-      pendingApprovals: (await this.pendingApprovals()).map((p) => ({
-        executionId: p.executionId, action: p.descriptor.action, input: p.descriptor.input, risk: p.descriptor.risk
+      submissions: (await this.listSubmissions()).map((s) => ({
+        id: s.submissionId, key: s.idempotencyKey, status: s.status, requestId: s.requestId, createdAt: s.createdAt,
+        source: s.metadata?.source, text: s.metadata?.text, causedBy: s.metadata?.causedBy
       })),
-      outbox: this.ctx.storage.sql.exec("SELECT key, recipient, body, status FROM app_outbox ORDER BY created_at").toArray(),
+      pendingApprovals: (await this.pendingApprovals()).map((p) => ({
+        executionId: p.executionId, action: p.descriptor.action, input: p.descriptor.input, risk: p.descriptor.risk,
+        requestId: p.descriptor.requestId
+      })),
+      outbox: this.ctx.storage.sql.exec("SELECT key, recipient, body, status, request_id AS requestId FROM app_outbox ORDER BY created_at").toArray(),
       // Is a run happening right now, or is the agent asleep (costing nothing)?
       busy: Boolean(this.activeTurn),
+      workingOn: this.activeTurn?.requestId ?? null,
       // Memory: the last few things in the conversation it keeps.
       notebook: this.messages.slice(-8).map((m) => ({
         role: m.role,
@@ -214,9 +221,9 @@ export class Assistant extends Think<Env> {
           .map((p) => ({ name: p.type.slice(5), state: (p as { state?: string }).state }))
       })),
       // Timers waiting to go off.
-      alarms: this.getSchedules<{ note: string }>()
+      alarms: this.getSchedules<{ note: string; from?: string }>()
         .filter((s) => s.callback === "followUp")
-        .map((s) => ({ id: s.id, note: s.payload?.note, at: "time" in s ? s.time : null }))
+        .map((s) => ({ id: s.id, note: s.payload?.note, from: s.payload?.from, at: "time" in s ? s.time : null }))
     };
   }
 

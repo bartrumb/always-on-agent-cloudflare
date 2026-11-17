@@ -81,9 +81,21 @@ tokens), which keeps a public demo cheap. For real work, change the model id in
 ## Public demo and cost guards
 
 The Worker serves a one-page UI (`public/index.html`). Each browser gets its own agent
-(one Durable Object), with panels for the inbox, approvals waiting for you, the outbox,
-and a release Workflow you can approve. Because anyone can use a public page, every run
-is kept small:
+(one Durable Object), drawn as a helper's desk: inbox tray, outbox tray, a "needs your
+signature" folder, a notebook and alarm clocks, plus a release Workflow you can approve.
+
+Three guided tests send one letter each and tick off the expected steps live:
+
+- **A risky job waits for a person:** the refund pauses for a signature, then goes out once.
+- **The same email arrives twice:** the second copy is stamped Duplicate and only one reply goes out.
+- **Check back later:** an alarm rings 15 seconds later and drops a new letter in the inbox.
+
+Every letter gets a number, and everything it causes carries that number: the signature
+form, the outbox reply, the alarm, and the follow-up letter. The agent stamps each item
+with the run (`requestId`) that made it, and hovering any item lights up the rest of
+its chain.
+
+Because anyone can use a public page, every run is kept small:
 
 - **Rate limit:** 10 model-waking requests a minute per IP (Workers Rate Limiting
   binding `EVENT_LIMIT`). Beyond that you get a 429.

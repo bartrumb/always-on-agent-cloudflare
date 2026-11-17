@@ -50,11 +50,35 @@ export default {
   }
 } satisfies ExportedHandler<Env>;
 
+// Serves a video from static assets with HTTP Range support. Lesson learned: static
+// assets always answer 200 with the whole file, and Safari on iPhone refuses to play
+// a video unless the server answers Range requests with 206 Partial Content. The
+// walkthrough is a few MB, so reading it and slicing in memory is fine.
+async function serveVideo(request: Request, env: Env, url: URL): Promise<Response> {
+  const asset = await env.ASSETS.fetch(new Request(new URL(url.pathname, url.origin)));
+  if (!asset.ok) return asset;
+  const body = await asset.arrayBuffer();
+  const size = body.byteLength;
+  const headers = { "content-type": "video/mp4", "accept-ranges": "bytes", "cache-control": "public, max-age=3600" };
+  const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.get("range") ?? "");
+  if (!range) return new Response(body, { headers: { ...headers, "content-length": String(size) } });
+  // "bytes=a-b", "bytes=a-" (to the end) or "bytes=-n" (the last n bytes).
+  let start = range[1] ? Number(range[1]) : size - Number(range[2]);
+  let end = range[1] && range[2] ? Number(range[2]) : size - 1;
+  start = Math.max(0, start); end = Math.min(end, size - 1);
+  if (start > end) return new Response(null, { status: 416, headers: { "content-range": `bytes */${size}` } });
+  return new Response(body.slice(start, end + 1), {
+    status: 206,
+    headers: { ...headers, "content-range": `bytes ${start}-${end}/${size}`, "content-length": String(end - start + 1) }
+  });
+}
+
 async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   // Public PostHog settings for the page. A PostHog project token is meant to be
   // public (browsers send it), so returning it is fine.
   if (url.pathname === "/config") return json({ posthogKey: env.POSTHOG_KEY ?? null, posthogHost: env.POSTHOG_HOST });
+  if (url.pathname.startsWith("/media/") && url.pathname.endsWith(".mp4")) return serveVideo(request, env, url);
 
   // Paths look like /<kind>/<user>/<a>/<b>, e.g. /approvals/s-123/actpause_456.
   const [, kind, user, a, b] = url.pathname.split("/");

@@ -1,0 +1,97 @@
+WEBVTT
+
+1
+00:00:00.400 --> 00:00:05.006
+Last week, Anthropic published a guide to building always-on agents.
+
+2
+00:00:05.006 --> 00:00:10.154
+Agents that sleep until something happens, do the job, and go back to sleep.
+
+3
+00:00:10.154 --> 00:00:13.608
+The guide explains the pattern with clear diagrams.
+
+4
+00:00:13.608 --> 00:00:15.166
+I wanted to see it run.
+
+5
+00:00:15.166 --> 00:00:18.350
+So I built it, Cloudflare style, and it's live.
+
+6
+00:00:19.800 --> 00:00:24.995
+Every piece of the guide lands on something Cloudflare already ships.
+
+7
+00:00:24.995 --> 00:00:31.846
+The inbox is a Durable Object for each user, so the same email sent twice only counts once.
+
+8
+00:00:31.846 --> 00:00:35.083
+Memory is that Durable Object's own SQLite.
+
+9
+00:00:35.083 --> 00:00:37.568
+Timers are Durable Object alarms.
+
+10
+00:00:37.568 --> 00:00:40.805
+Permissions pause the work and end the run.
+
+11
+00:00:40.805 --> 00:00:43.440
+And the outbox is the only way out.
+
+12
+00:00:44.867 --> 00:00:46.549
+Here's my favorite part.
+
+13
+00:00:46.549 --> 00:00:51.317
+Ask for a refund, and the agent fills in the form and goes to sleep.
+
+14
+00:00:51.317 --> 00:00:53.350
+It doesn't sit there waiting.
+
+15
+00:00:53.350 --> 00:01:01.342
+When you sign, an hour or a week later, it wakes up right where it left off, and the refund goes out exactly once.
+
+16
+00:01:01.342 --> 00:01:04.357
+Say no, and it tells the customer that too.
+
+17
+00:01:05.800 --> 00:01:09.798
+Every letter gets a number, so you can follow it across the desk.
+
+18
+00:01:09.798 --> 00:01:13.612
+Send the same letter twice, and the copy is stamped duplicate.
+
+19
+00:01:13.612 --> 00:01:18.103
+Ask for a reminder, and an alarm wakes the agent with a brand new letter.
+
+20
+00:01:18.103 --> 00:01:22.470
+Tap the chat bubble to see everything it did while you weren't looking.
+
+21
+00:01:23.933 --> 00:01:32.028
+Under the hood, it's Cloudflare's Think agent harness on Durable Objects and Workflows, with Claude Haiku doing the thinking.
+
+22
+00:01:32.028 --> 00:01:34.748
+The demo and the code are in the comments.
+
+23
+00:01:34.748 --> 00:01:39.605
+Thank you, William Hu, Rodrigo Olivares, and Michael Segner, for the guide.
+
+24
+00:01:39.605 --> 00:01:42.843
+What would you have your always-on agent do first?

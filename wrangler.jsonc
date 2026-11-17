@@ -35,11 +35,13 @@
     "POSTHOG_HOST": "https://us.i.posthog.com"
   },
 
-  // Static one-page UI. API paths go to the Worker first.
+  // Static one-page UI. API paths go to the Worker first. Videos too: static assets
+  // don't answer HTTP Range requests, and Safari on iPhone won't play video without
+  // them, so the Worker serves *.mp4 with byte ranges (see serveVideo in src/index.ts).
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "run_worker_first": ["/config", "/events/*", "/status/*", "/approvals/*", "/releases/*", "/agents/*"]
+    "run_worker_first": ["/config", "/events/*", "/status/*", "/approvals/*", "/releases/*", "/agents/*", "/media/*.mp4"]
   },
 
   // Public demo: cap how fast one IP can wake the model.

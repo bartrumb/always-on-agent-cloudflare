@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Always-on Agent Walkthrough</title>
+<meta name="description" content="A two-minute walkthrough: Anthropic's always-on agent pattern, built on Cloudflare and running live.">
+<meta property="og:type" content="video.other">
+<meta property="og:title" content="Always-on agent on Cloudflare: 2-minute walkthrough">
+<meta property="og:description" content="Anthropic's always-on agent pattern, built on Workers, Durable Objects, Workflows and Think, with Claude.">
+<meta property="og:url" content="https://always-on-agent.shopdawg.workers.dev/walkthrough">
+<meta property="og:image" content="https://always-on-agent.shopdawg.workers.dev/og.png">
+<meta property="og:video" content="https://always-on-agent.shopdawg.workers.dev/media/walkthrough.mp4">
+<meta property="og:video:type" content="video/mp4">
+<meta property="og:video:width" content="1080">
+<meta property="og:video:height" content="1350">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  /* Same palette as the demo page: Cloudflare orange and tangerine on charcoal and greys. */
+  :root { --bg: #f2f2f2; --paper: #ffffff; --ink: #404041; --soft: #6d6d6f; --rule: #e2e2e2; --orange: #f38020; --on-orange: #1d1d1f; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #1b1b1c; --paper: #262628; --ink: #f2f2f2; --soft: #a8a8ab; --rule: #3a3a3d; --orange: #f6821f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 "Atkinson Hyperlegible Next", system-ui, sans-serif; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 16px 56px; }
+  h1 { font-size: clamp(30px, 5vw, 44px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 12px; font-weight: 800; }
+  p { margin: 0 0 18px; max-width: 60ch; }
+  .lede { font-size: 19px; }
+  .video { background: #16181d; border-radius: 18px; padding: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.2); }
+  /* The video is 4:5 portrait; cap its height so it fits a laptop screen. */
+  video { display: block; width: 100%; max-height: 82vh; border-radius: 12px; background: #000; }
+  .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  .links a { font-weight: 600; text-decoration: none; border-radius: 6px; padding: 10px 16px; border: 1.5px solid var(--ink); color: var(--ink); }
+  .links a.go { background: var(--orange); border-color: var(--orange); color: var(--on-orange); }
+  .links a:focus-visible { outline: 3px solid var(--orange); outline-offset: 2px; }
+  .small { color: var(--soft); font-size: 15px; margin-top: 22px; }
+  .small a { color: inherit; text-decoration-color: var(--orange); }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>The always-on agent, in two minutes</h1>
+  <p class="lede">Anthropic's guide to always-on agents, built on Cloudflare and running live. Captions are on; turn on sound for the narration.</p>
+  <div class="video">
+    <video controls playsinline preload="metadata" poster="/media/walkthrough-poster.png" width="1080" height="1350">
+      <source src="/media/walkthrough.mp4" type="video/mp4">
+      <track kind="captions" src="/media/walkthrough.vtt" srclang="en" label="English" default>
+      Your browser can't play this video. <a href="/media/walkthrough.mp4">Download it</a> instead.
+    </video>
+  </div>
+  <div class="links">
+    <a class="go" href="/">Try the live demo</a>
+    <a href="https://github.com/bartrumb/always-on-agent-cloudflare">Read the code</a>
+  </div>
+  <p class="small">Based on <a href="https://claude.com/resources/articles/building-always-on-agents">Building always-on agents</a> by William Hu, Anthropic, with contributions from Rodrigo Olivares and Michael Segner.</p>
+</main>
+</body>
+</html>

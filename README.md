@@ -10,6 +10,10 @@ window and starts reacting to events. It is written in prose and diagrams, with 
 code and no named platform. This repo shows each part as working code, using the
 pieces Cloudflare already ships, and adds only what is missing.
 
+**[Try the live demo](https://always-on-agent.shopdawg.workers.dev)** or
+**[watch the 2-minute walkthrough](https://always-on-agent.shopdawg.workers.dev/walkthrough)**
+(narrated, with captions).
+
 ```bash
 npm install
 npm run dev         # open http://localhost:8787 for the one-page UI
@@ -194,6 +198,7 @@ src/release-workflow.ts  ReleaseWorkflow (ThinkWorkflow): deploy-safety demo
 src/mock-model.ts        scripted model for keyless runs
 src/telemetry.ts         PostHog capture (LLM generations, errors)
 public/index.html        one-page UI
+public/walkthrough.html  the narrated video page (media in public/media)
 public/architecture.svg  architecture diagram (built by docs/build-diagram.mjs)
 scripts/demo.mjs         end-to-end demo and checks
 ```

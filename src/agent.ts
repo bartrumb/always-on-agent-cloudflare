@@ -40,6 +40,28 @@ import { capture, captureError, generationEvent } from "./telemetry";
 //     of the demo worth trying.
 //  2. The always-on rules. The key one: the model may only reach the user through the
 //     outbox (send_message), so every outgoing message is recorded, deduplicated and retried.
+// Lesson learned: after a person approves or declines a paused action, Think wakes the
+// model once more with "Continue your previous response..." (a continuation turn). By
+// then the visitor has already been told by code (the refund's execute(), or decide() for
+// a "no"). Given tools, Claude would read the result and send a confused "Correction to
+// my last message..." that contradicted that notice. So a continuation that follows an
+// issue_refund call runs with no tools. Other continuations (say, a run resumed after a
+// deploy) keep their tools.
+//
+// Lesson two: muting that turn wasn't enough. On the NEXT letter Claude read its history:
+// its own "waiting for sign-off" note, then a bare "rejected" tool result. The outbox
+// notice is sent by code, so it never appears in the transcript, and from where Claude
+// sits its earlier note looked wrong, so it apologized for it. The fix is to put the
+// missing fact where the model reads: in the tool result itself.
+const ALREADY_TOLD =
+  "The visitor was told this automatically when it happened. Your earlier note that it was waiting for sign-off was accurate at the time. Don't correct it or announce it again.";
+
+function afterDecision(ctx: TurnContext) {
+  const recent = JSON.stringify(ctx.messages.slice(-4));
+  const nudged = ctx.continuation || /Continue your previous response/i.test(recent);
+  return nudged && recent.includes("issue_refund");
+}
+
 const SYSTEM = `You are the helper in a public, live demo of an always-on agent: Anthropic's
 "Building always-on agents" pattern, built on Cloudflare (Workers, Durable Objects, Think).
 The people writing to you are visitors trying the demo. You are woken by events (messages,
@@ -61,9 +83,10 @@ Who you're talking to
 How you work
 - Never answer in plain text alone: reach the visitor only through send_message.
 - Refunds need a human: when someone asks for one, call issue_refund right away with the
-  order id, then stop. Include the amount only if they stated it; never ask for it first.
-  The person who approves confirms the amount. Don't send your own message about the
-  refund: the visitor is told automatically when it's issued or declined.
+  order id. Include the amount only if they stated it; never ask for it first. The person
+  who approves confirms the amount. Then send one short note that it's waiting for a
+  human to sign off. Don't promise an outcome: the visitor is told automatically when it's
+  issued or declined, and you never need to follow up or correct that notice.
 - When asked to check back or be reminded later, call schedule_follow_up. When that timer
   fires, send the reminder they asked for.
 - Save standing instructions from the visitor (e.g. "always reply in Spanish") in your
@@ -130,13 +153,18 @@ export class Assistant extends Think<Env> {
   //  1. Remember the run's id (requestId) and input for the analytics above.
   //  2. Return per-run limits. These are the cost guards for a public demo:
   //     low effort, at most 1,024 output tokens, at most 4 model/tool rounds.
+  //  3. Mute the turn right after a refund decision (see afterDecision below).
   beforeTurn(ctx: TurnContext) {
     this.turn = {
       traceId: ctx.requestId ?? crypto.randomUUID(),
       stepStart: Date.now(),
       input: ctx.messages.slice(-3).map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content.slice(0, 1000) : m.content }))
     };
-    return { maxSteps: 4, maxOutputTokens: 1024, providerOptions: { anthropic: { effort: "low" } } };
+    const limits = { maxSteps: 4, maxOutputTokens: 1024, providerOptions: { anthropic: { effort: "low" as const } } };
+    // No tools means no send_message, and send_message is the only way out, so
+    // whatever the model writes in this turn stays in the transcript. One step is enough.
+    if (afterDecision(ctx)) return { ...limits, maxSteps: 1, activeTools: [] };
+    return limits;
   }
 
   getSystemPrompt() {
@@ -201,13 +229,15 @@ export class Assistant extends Think<Env> {
         }),
         idempotencyKey: ({ input }) => `refund:${input.orderId}`,
         execute: async ({ orderId, amountUsd }, ctx) => {
-          // The outbox message IS the customer's notice; the prompt tells the model not to
-          // send its own, so there's one clear, accurate message per decision.
+          // The outbox message IS the customer's notice. The model's follow-up turn runs
+          // without tools (see afterDecision), so there's one accurate message per decision.
           const body = amountUsd
             ? `Refund of $${amountUsd} issued for order ${orderId}.`
             : `Your refund for order ${orderId} has been issued.`;
           this.enqueueOutbox(`refund:${orderId}`, "user", body, ctx.requestId);
-          return { refunded: true, orderId, amountUsd };
+          // This return value is all the model will ever see of the decision, so it says
+          // the visitor was already told (see ALREADY_TOLD).
+          return { refunded: true, orderId, amountUsd, visitorAlreadyTold: body, note: ALREADY_TOLD };
         }
       }),
 
@@ -260,19 +290,19 @@ export class Assistant extends Think<Env> {
   //   no  -> rejectExecution(): execute() never runs. A "no" is news too, so we also
   //          tell the user through the outbox, tied to the run that asked (d.requestId).
   // pendingApprovals(id) is read BEFORE rejecting, because rejecting removes the entry.
+  // The rejection reason becomes the tool result the model reads later, so it carries
+  // the notice the visitor already got (see ALREADY_TOLD for why).
   async decide(executionId: string, approve: boolean, reason?: string) {
     this.track(capture(this.env, "approval_decided", this.name, { approve }));
     if (approve) return this.approveExecution(executionId);
     const [pending] = await this.pendingApprovals(executionId);
-    const result = await this.rejectExecution(executionId, reason ?? "Rejected");
-    if (pending) {
-      const d = pending.descriptor;
-      const input = d.input as { orderId?: string } | undefined;
-      const body = d.action === "issue_refund" && input?.orderId
-        ? `Your refund for order ${input.orderId} was not approved, so I haven't issued it.`
-        : `"${d.summary}" was not approved, so I didn't do it.`;
-      this.enqueueOutbox(`declined:${executionId}`, "user", body, d.requestId);
-    }
+    const d = pending?.descriptor;
+    const input = d?.input as { orderId?: string } | undefined;
+    const body = d?.action === "issue_refund" && input?.orderId
+      ? `Your refund for order ${input.orderId} was not approved, so I haven't issued it.`
+      : `"${d?.summary ?? "That action"}" was not approved, so I didn't do it.`;
+    const result = await this.rejectExecution(executionId, `${reason ?? "Declined by the approver"}. Visitor already told: "${body}" ${ALREADY_TOLD}`);
+    if (d) this.enqueueOutbox(`declined:${executionId}`, "user", body, d.requestId);
     return result;
   }
 

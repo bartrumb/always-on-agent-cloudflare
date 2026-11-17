@@ -1,11 +1,29 @@
-// PostHog capture over plain fetch: no SDK, nothing that needs Node, safe on Workers
-// and inside Durable Objects. A no-op until POSTHOG_KEY is set.
+// =====================================================================================
+// telemetry.ts: PostHog events from the server, with plain fetch.
 //
-// The browser page uses its session id as the PostHog distinct id, and the server
-// uses the same id, so a person's pageviews, replay, LLM generations and errors join up.
+// Optional reading. The pattern works without it; it's how you watch an agent that
+// works while nobody is looking.
+//
+// Two views of the same activity
+//   Cloudflare traces (wrangler.jsonc, `observability`): where each request went, and
+//     how long each stop took. On automatically; Think adds spans for runs and tools.
+//   PostHog (this file + the page): what the agent did and why. One $ai_generation
+//     event per model call (model, tokens, latency, tool calls), $exception for errors,
+//     and a few named events (event_received, approval_decided, release_started).
+//
+// Why fetch and not an SDK: PostHog's Node SDK and OpenTelemetry's Node SDK expect
+// Node.js; plain fetch to the capture API works anywhere, including inside Workers
+// and Durable Objects. Everything here is a no-op until POSTHOG_KEY is set.
+//
+// One id everywhere: the page uses its session id as PostHog's distinct id, and the
+// agent's name is that same id, so a visitor's pageviews, replay, model calls and
+// errors all line up in PostHog.
+// =====================================================================================
 
 export type Props = Record<string, unknown>;
 
+// Sends one event to PostHog's capture endpoint. Never throws: analytics failing must
+// not break the agent, so errors are logged and swallowed.
 export function capture(env: Env, event: string, distinctId: string, properties: Props = {}): Promise<void> {
   if (!env.POSTHOG_KEY) return Promise.resolve();
   return fetch(`${env.POSTHOG_HOST}/i/v0/e/`, {
@@ -20,13 +38,14 @@ export function capture(env: Env, event: string, distinctId: string, properties:
     })
   })
     .then(() => undefined)
-    .catch((err) => console.error("[posthog] capture failed", err)); // never break the app
+    .catch((err) => console.error("[posthog] capture failed", err));
 }
 
-// PostHog error tracking event.
+// PostHog error tracking reads the $exception event with an $exception_list. The
+// console.error also puts the error in Workers Logs, next to its trace.
 export function captureError(env: Env, distinctId: string, err: unknown, props: Props = {}) {
   const e = err instanceof Error ? err : new Error(String(err));
-  console.error(`[error] ${e.message}`, props); // also lands in Workers Logs
+  console.error(`[error] ${e.message}`, props);
   return capture(env, "$exception", distinctId, {
     $exception_list: [{ type: e.name, value: e.message, stacktrace: { type: "raw", frames: [] }, mechanism: { handled: true } }],
     $exception_message: e.message,
@@ -35,9 +54,15 @@ export function captureError(env: Env, distinctId: string, err: unknown, props: 
   });
 }
 
+// Long strings are cut so one event stays small.
 const clip = (s: unknown, n = 2000) => (typeof s === "string" ? s.slice(0, n) : s);
 
-// One model call -> one $ai_generation event (PostHog LLM analytics).
+// Turns one AI SDK "step" (one model call, as Think reports it to onStepEnd) into the
+// properties PostHog LLM analytics expects. The $ai_* names come from PostHog's
+// manual-capture docs:
+//   $ai_trace_id   groups the calls of one run (Think's requestId)
+//   $ai_session_id groups runs into a conversation (the visitor / agent id)
+//   tokens, latency, stop reason and tool calls for cost and debugging
 export function generationEvent(step: {
   model: { provider: string; modelId: string };
   usage: { inputTokens?: number; outputTokens?: number; inputTokenDetails?: { cacheReadTokens?: number; cacheWriteTokens?: number } };
@@ -51,6 +76,7 @@ export function generationEvent(step: {
     $ai_session_id: ids.sessionId,
     $ai_span_name: `step-${step.stepNumber}`,
     $ai_model: step.model.modelId,
+    // The AI SDK reports providers like "anthropic.messages"; PostHog wants "anthropic".
     $ai_provider: step.model.provider.split(".")[0],
     $ai_input: ids.input,
     $ai_input_tokens: step.usage.inputTokens ?? 0,

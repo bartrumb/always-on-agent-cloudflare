@@ -1,8 +1,18 @@
-// Builds public/architecture.svg: a plain SVG (no HTML inside), so it renders the same
-// on GitHub, in browsers and in image viewers. Run: node docs/build-diagram.mjs
+// =====================================================================================
+// build-diagram.mjs: draws public/architecture.svg.   Run: node docs/build-diagram.mjs
+//
+// Optional reading; it's not part of the agent. The diagram is plain SVG (no HTML
+// inside), so it renders the same on GitHub, in browsers and in image viewers. Diagram
+// tools like Mermaid often put HTML labels inside SVG, which some viewers drop.
+//
+// How it's built: small helpers return SVG strings (icon tiles, cards, arrows), and the
+// template at the bottom places them on a 1650 x 870 canvas. To change the layout,
+// edit the x/y numbers in that template and re-run.
 //
 // Product icons: Cloudflare docs (github.com/cloudflare/cloudflare-docs, src/icons),
-// licensed CC BY 4.0. Cloudflare's docs use one icon for both Workers and Workflows.
+// licensed CC BY 4.0, copied into docs/icons. Cloudflare's docs use one icon for both
+// Workers and Workflows; the labels tell them apart.
+// =====================================================================================
 import { readFileSync, writeFileSync } from "node:fs";
 
 const C = { orange: "#F38020", tangerine: "#FAAE40", ink: "#404041", soft: "#6D6D6F", line: "#8A8A8D",

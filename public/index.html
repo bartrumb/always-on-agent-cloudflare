@@ -505,9 +505,32 @@
 </section>
 
 <script>
+// =====================================================================================
+// The demo page's script. Optional reading for the pattern; read it to see how a UI can
+// watch an agent that works in the background.
+//
+// How the page works, in one loop
+//   1. Every ~1.5 s (0.6 s while something is happening) it calls GET /status/:sid.
+//      The agent returns everything it holds: inbox, approvals, outbox, alarms, notes.
+//   2. render() draws the desk, the test cards and the chat from that one snapshot,
+//      and narrate() compares it with the previous snapshot to write "what happened".
+//   3. Buttons POST to the Worker (events, approvals, releases) and then refresh.
+//   The page never talks to the model. It only reads what the agent did, the same way a
+//   real always-on agent's users would only see its effects.
+//
+// Each browser is one "helper": a random session id (sid) kept in localStorage. The
+// Worker maps it to one Durable Object, so every visitor has their own agent.
+//
+// Sections below: storage helpers, PostHog, the API call (with server time), story
+// feed, stamps, letter numbering, guided tests, chat, narration, rendering, tracing,
+// the release chore, and the refresh loop.
+// =====================================================================================
 const $ = (id) => document.getElementById(id);
 const untag = (s) => String(s ?? "").replace(/\[(email|chat|webhook|timer)\]\s*/g, "");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// localStorage can throw (private mode, blocked storage), so every read and write is
+// wrapped; the page still works without it, it just forgets between reloads.
+// load/save keep per-helper values under "<name>:<sid>".
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const load = (k, d) => { try { return JSON.parse(store.get(k + ":" + sid) || "null") ?? d; } catch { return d; } };
 const save = (k, v) => store.set(k + ":" + sid, JSON.stringify(v));
@@ -515,7 +538,9 @@ const newId = () => "s-" + crypto.randomUUID().slice(0, 12);
 let sid = store.get("sid") || newId(); store.set("sid", sid);
 $("sid").textContent = sid;
 
-// Per-helper memory of what this browser did (tests run, duplicates seen, refunds signed).
+// Per-helper memory of what THIS browser did. The server knows the facts (what arrived,
+// what was sent), but not which clicks happened here, e.g. which test sent which letter,
+// or that a duplicate was sent. These fill in that part of the story.
 let runs = load("runs", {}), dupKeys = new Set(load("dups", [])), signed = new Set(load("signed", [])), declined = new Set(load("declined", []));
 let lastEvent = null, relId = store.get("rel:" + sid), prev = null, snap = null;
 
@@ -535,6 +560,10 @@ fetch("/config").then((r) => r.json()).then((cfg) => {
 }).catch(() => {});
 const track = (event, props) => { try { ph && ph.capture(event, props); } catch {} };
 
+// Lesson learned: alarm times and outbox times come from the server, but Date.now() is
+// this device's clock. A test machine ran ~10 s fast, so alarms showed 0:00 too early
+// and the chat sorted events in the wrong order. skew = server time - device time,
+// taken from each response's Date header; serverNow() is "now" on the server's clock.
 // Server time, so countdowns and the chat's order hold even when this device's clock is off.
 // The Date header has 1 s resolution, which is plenty here.
 let skew = 0;
@@ -548,6 +577,7 @@ async function api(method, path, body) {
 }
 
 // ---- Story feed -------------------------------------------------------------
+// The "What just happened" list: newest first, the last 14 lines.
 const said = [];
 function say(text) {
   const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
@@ -557,6 +587,8 @@ function say(text) {
 function storyEmpty() { if (!said.length) $("story").innerHTML = `<li>Nothing yet. Run a test above to wake the helper.</li>`; }
 
 // ---- Stamps: thunk only the first time something appears ----------------------
+// Rubber-stamp words (Duplicate, Sent, Sign here). The "thunk" animation plays only the
+// first time a given stamp appears, never on reload: `seen` remembers the stamp keys.
 const seen = new Set(load("seen", []));
 let firstPaint = true;
 function stamp(key, word, green) {
@@ -566,6 +598,12 @@ function stamp(key, word, green) {
 }
 
 // ---- Letters: number every submission and trace what it caused -----------------
+// The key idea of the page. The agent stamps everything it creates with the run's
+// requestId (see agent.ts), so the page can say "Reply to letter 2" or "the alarm set
+// by letter 3 rang". letters() numbers submissions by arrival and builds lookups:
+//   byReq: run id -> letter     byId: submission id -> letter
+// and for each letter, `parent` (the letter whose alarm created it) and `root` (the
+// first letter in the chain), used to light up a whole chain when you hover.
 // n = letter number (by arrival). root = the letter a chain started from
 // (a timer's letter belongs to the letter that set the timer).
 function letters(s) {
@@ -589,6 +627,10 @@ const empty = (t) => `<li class="empty">${t}</li>`;
 const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
 
 // ---- Guided tests ---------------------------------------------------------------
+// Each test sends one letter, then checks its steps against the latest snapshot. A step
+// has: label, done(c) (has it happened?), detail(c) (what happened, in which box),
+// optional busy(c) ("working on it now") and action(c) (buttons, e.g. Sign it).
+// `c` is built by testContext(): the test's letter and everything traced to it.
 // Each step says what should happen and, once it has, shows what actually happened and
 // in which box, so the whole chain reads top to bottom inside the card (good on phones).
 const where = (box, html) => `<span class="step-detail"><span class="where">${box}:</span>${html}</span>`;
@@ -675,6 +717,8 @@ function testContext(t, s, lt) {
 
 // One slot per card, redrawn on its own, so a countdown in one card never replaces
 // the buttons in another while someone is tapping them.
+// Draws all three cards. The first step that isn't done yet is "now", and shows its
+// hint, buttons or a working indicator.
 function renderTests(s, lt) {
   const box = $("tests");
   if (!box.children.length) box.innerHTML = TESTS.map((t) => `<div id="test-${t.id}"></div>`).join("");
@@ -702,6 +746,8 @@ function renderTests(s, lt) {
   })()));
 }
 
+// Sends the test's letter with a fresh event id. The duplicate test sends the same
+// event (same id) a second time and records whether the server ignored it.
 async function runTest(id) {
   const t = TESTS.find((x) => x.id === id);
   const event = { ...t.letter(), id: crypto.randomUUID().slice(0, 8) };
@@ -723,7 +769,6 @@ async function runTest(id) {
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-test]"); if (b) runTest(b.dataset.test); });
 
-// ---- Own letter -------------------------------------------------------------------
 // ---- Chat popover ----------------------------------------------------------------------
 // The whole conversation with the helper, in time order: your letters, its replies (from the
 // outbox), signature requests you can answer in place, and notes for alarms and duplicates.
@@ -755,6 +800,9 @@ async function send(event) {
 function chatError(msg) { $("chatError").textContent = msg; setTimeout(() => ($("chatError").textContent = ""), 6000); }
 
 const srcWord = { email: "by email", chat: "in chat", webhook: "by webhook" };
+// Builds the conversation in time order from the snapshot plus this browser's own logs.
+// Each item has a time (t), a stable key, and whether it counts toward the badge
+// (`unread`: things the helper did, not things you did). Times are server times.
 function chatItems(s, lt) {
   const items = [];
   const statusWord = { pending: "waiting its turn", running: "being worked on", completed: "done" };
@@ -809,6 +857,9 @@ function chatItems(s, lt) {
   return items;
 }
 
+// Draws the chat and the badge. While the chat is open everything is marked seen; while
+// it's closed, new helper activity raises the count. The log only redraws when its
+// content changed, and only scrolls to the bottom if you were already near it.
 function renderChat(s, lt) {
   const items = chatItems(s, lt);
   if (chatOpen) { let changed = false; for (const it of items) if (it.unread && !seenChat.has(it.key)) { seenChat.add(it.key); changed = true; } if (changed) save("seenChat", [...seenChat]); }
@@ -869,6 +920,8 @@ $("reset").onclick = () => {
   refresh();
 };
 
+// Answers a paused action (Sign it / Say no) from a test card, the desk or the chat.
+// The Worker calls agent.decide(); the page also notes the decision for the story.
 async function decide(id, approve, subId) {
   try {
     await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
@@ -882,6 +935,8 @@ async function decide(id, approve, subId) {
 window.decide = decide;
 
 // ---- Narration ------------------------------------------------------------------------
+// Compares this snapshot with the previous one and writes a plain sentence for each
+// change: a letter arrived, the helper woke up, a signature is needed, a message went out.
 function narrate(s, lt) {
   if (!prev) return;
   const was = new Map(prev.submissions.map((x) => [x.id, x.status]));
@@ -906,6 +961,9 @@ function narrate(s, lt) {
 }
 
 // ---- Render the desk -------------------------------------------------------------------
+// Draws every box from one snapshot. Lesson learned: redrawing a panel replaces its
+// buttons, which drops keyboard focus and can swallow a click mid-tap. put() therefore
+// only touches a panel when its HTML actually changed.
 function render(s) {
   const lt = letters(s);
   narrate(s, lt);
@@ -986,6 +1044,9 @@ function paintClocks() {
 setInterval(() => { paintClocks(); if (snap) { const lt = letters(snap); renderTests(snap, lt); renderChat(snap, lt); } }, 1000);
 
 // ---- Tracing: light up everything from one letter, across all boxes -------------------
+// Hovering (or tabbing to) any item with data-root outlines everything in the same chain
+// and fades the rest. Only on devices that can hover: on a phone a tap would leave the
+// page faded, and the test cards already show each chain inline.
 let trace = null;
 function applyTrace(root) {
   document.querySelectorAll("[data-root]").forEach((el) => el.classList.toggle("lit", el.dataset.root === root));
@@ -1002,6 +1063,7 @@ if (canHover) document.addEventListener("mouseover", traceFrom);
 document.addEventListener("focusin", (e) => { if (canHover || e.target.matches?.(":focus-visible")) traceFrom(e); });
 
 // ---- Release chore ------------------------------------------------------------------------
+// The checklist for release-workflow.ts. Ticks come from the steps the agent logged.
 async function refreshRelease() {
   const rows = document.querySelectorAll("#checks li");
   if (!relId) { rows.forEach((li) => (li.className = "")); $("approveRel").disabled = true; $("relStatus").textContent = "Not started."; return; }
@@ -1038,6 +1100,8 @@ async function refresh() {
 storyEmpty();
 renderTests(null);
 refresh();
+// The refresh loop: check often while work is happening (the helper is busy, letters are
+// waiting, an alarm is set, or a test letter hasn't shown up yet), otherwise relax.
 let lastBusy = false;
 (function loop() {
   setTimeout(async () => { if (!document.hidden) await refresh(); loop(); }, lastBusy ? 600 : 1500);

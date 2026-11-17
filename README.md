@@ -31,6 +31,49 @@ npm run demo        # or: scripted end-to-end run with checks; no API key needed
 The diagram is plain SVG built by `node docs/build-diagram.mjs` from Cloudflare's product icons
 (in `docs/icons`, from the Cloudflare docs, CC BY 4.0).
 
+## Read the code
+
+The code is commented to be read. Every file opens with what it does and which part of
+the article it implements, and the comments explain why, not only what. Read it in
+this order (about 600 lines for the core):
+
+1. **[`src/index.ts`](src/index.ts)**: the Worker, the front door. Short, and it shows
+   the shape of the whole system: accept fast, hand off to that user's agent, reply.
+2. **[`src/agent.ts`](src/agent.ts)**: the agent itself. The header maps each of the
+   article's five pieces to a method; each piece has its own section below.
+3. **[`src/release-workflow.ts`](src/release-workflow.ts)**: deploy safety. Why
+   Workflow step names are cache keys, and what goes wrong when you rename one.
+4. **[`scripts/demo.mjs`](scripts/demo.mjs)**: the whole story as a test. Each numbered
+   section exercises one piece over HTTP and asserts what should happen.
+5. **[`wrangler.jsonc`](wrangler.jsonc)**: how it's wired: the Durable Object, the
+   Workflow, static assets, the rate limit, and observability.
+
+Optional: [`src/telemetry.ts`](src/telemetry.ts) (PostHog from a Worker with plain
+`fetch`), [`src/mock-model.ts`](src/mock-model.ts) (a scripted model so everything runs
+without an API key), [`public/index.html`](public/index.html) (the page: how a UI can
+follow an agent that works in the background), and
+[`docs/build-diagram.mjs`](docs/build-diagram.mjs).
+
+### Lessons learned while building it
+
+Each of these is also explained where it happens in the code.
+
+- **A paused action keeps its original run id.** When an approved `durable-pause` action
+  finally runs, `ctx.requestId` is still the id of the run that asked. That's how the
+  refund message links back to the letter that requested it.
+- **Think's `activeTurn` is only for live chat.** Runs started from the inbox show up as a
+  submission with status `running` instead, so "is the agent busy?" checks both.
+- **After an approval, Think continues the conversation** with an automatic "continue"
+  message. A model, or a scripted stand-in, mustn't treat it as a new request.
+- **A "no" is news too.** Rejecting an action runs nothing, so the agent sends a "not
+  approved" message through the outbox, or the customer never hears back.
+- **The outbox is what makes retries safe.** A retried run only tries to insert the same
+  key again, which is ignored, so nothing is sent twice.
+- **A paused Workflow can report `running`, not `waiting`.** Check which steps finished
+  instead of trusting the status alone.
+- **Don't trust the visitor's clock.** Compare server times with server time; the page
+  corrects for the device's clock using each response's `Date` header.
+
 ## What the demo shows
 
 `npm run demo` starts `wrangler dev`, sends HTTP requests to it, and checks the results:

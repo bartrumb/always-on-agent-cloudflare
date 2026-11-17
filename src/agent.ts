@@ -211,7 +211,7 @@ export class Assistant extends Think<Env> {
         executionId: p.executionId, action: p.descriptor.action, input: p.descriptor.input, risk: p.descriptor.risk,
         requestId: p.descriptor.requestId
       })),
-      outbox: this.ctx.storage.sql.exec("SELECT key, recipient, body, status, request_id AS requestId FROM app_outbox ORDER BY created_at").toArray(),
+      outbox: this.ctx.storage.sql.exec("SELECT key, recipient, body, status, request_id AS requestId, created_at AS createdAt, sent_at AS sentAt FROM app_outbox ORDER BY created_at").toArray(),
       // Is a run happening right now, or is the agent asleep (costing nothing)?
       busy: Boolean(this.activeTurn || running),
       workingOn: this.activeTurn?.requestId ?? running?.requestId ?? null,

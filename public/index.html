@@ -183,6 +183,44 @@
   footer { margin-top: 40px; color: var(--soft); font-size: 14px; max-width: 70ch; }
   footer p { margin: 0 0 8px; }
 
+  /* Chat button and popover */
+  .chat-btn { position: fixed; right: 20px; bottom: 20px; z-index: 30; width: 62px; height: 62px; border-radius: 50%; border: 0; padding: 0;
+    background: var(--orange); color: var(--on-orange); display: grid; place-items: center; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .chat-btn .badge { position: absolute; top: -4px; right: -4px; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
+    background: var(--ink); color: var(--paper); font-size: 13px; font-weight: 800; line-height: 20px; text-align: center; border: 2px solid var(--paper); }
+  .chat-btn .badge[hidden] { display: none; }
+  .badge.bump { animation: bump .45s cubic-bezier(.2,.9,.3,1.4); }
+  @keyframes bump { from { transform: scale(1.8); } to { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) { .badge.bump { animation: none; } }
+  .chat { position: fixed; right: 20px; bottom: 96px; z-index: 30; width: 390px; height: min(620px, calc(100vh - 140px));
+    background: var(--paper); border-radius: 10px; box-shadow: 0 16px 40px rgba(0,0,0,.28); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--rule); }
+  .chat[hidden] { display: none; }
+  .chat-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 3px solid var(--orange); }
+  .chat-sub { display: block; font-size: 13px; color: var(--soft); }
+  .chat-x { border: 0; font-size: 26px; line-height: 1; padding: 2px 8px; color: var(--soft); }
+  .chat-log { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; background: var(--desk); }
+  .msg { max-width: 86%; padding: 8px 12px; border-radius: 12px; font-size: 15px; overflow-wrap: anywhere; }
+  .msg p { margin: 4px 0 2px; }
+  .msg.me { align-self: flex-end; background: var(--paper); border: 1.5px solid var(--orange); border-bottom-right-radius: 3px; }
+  .msg.helper { align-self: flex-start; background: var(--paper); border: 1px solid var(--rule); border-bottom-left-radius: 3px; }
+  .msg.ask { border: 2px solid var(--folder-deep); background: color-mix(in srgb, var(--folder) 22%, var(--paper)); }
+  .msg .via, .msg .meta-line { font-size: 12px; color: var(--soft); }
+  .msg .row { margin-top: 6px; }
+  .note { align-self: center; text-align: center; font-size: 13px; color: var(--soft); max-width: 92%; }
+  .note .tag { margin: 0 0 0 2px; }
+  .starters { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .linkish { border: 0; padding: 0 0 0 6px; font-size: 12px; color: var(--ink); text-decoration: underline; text-decoration-color: var(--orange); font-weight: 600; }
+  .typing { color: var(--soft); font-size: 14px; }
+  .dots { display: inline-flex; gap: 3px; margin-right: 6px; vertical-align: middle; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); animation: pulse 1s infinite; }
+  .dots i:nth-child(2) { animation-delay: .2s; } .dots i:nth-child(3) { animation-delay: .4s; }
+  .chat-form { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--rule); align-items: flex-end; }
+  .chat-form textarea { min-height: 44px; resize: none; font-size: 16px; }
+  .chat-error { font-size: 13px; color: var(--red); padding: 0 12px 8px; }
+  .chat-error:empty { display: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  footer { padding-bottom: 72px; }
+
   /* Guided tests */
   .tests { margin-top: 48px; }
   .tests h2 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.01em; }
@@ -222,6 +260,8 @@
     .desk { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 620px) {
+    .chat { left: 8px; right: 8px; width: auto; top: 64px; bottom: 88px; height: auto; }
+    .chat-btn { right: 14px; bottom: 14px; }
     .wrap { padding-top: 20px; }
     .sb-link { margin-left: 0; }
     .sb-inner { font-size: 14px; }
@@ -264,25 +304,12 @@
   <section class="tests" aria-labelledby="tests-h">
     <h2 id="tests-h">Run a test</h2>
     <p>Each test sends one letter. Its steps fill in right here as the letter moves across the helper's desk,
-      and when it's your turn, the button appears in the step. The bar at the top shows when the helper is working.</p>
+      and when it's your turn, the button appears in the step. The bar at the top shows when the helper is working.
+      To write your own letters, open the chat button in the corner.</p>
     <div class="tgrid" id="tests"></div>
   </section>
 
-  <section class="own">
-    <form class="slot" id="slotForm">
-      <h2>Or write your own letter</h2>
-      <p>This is what a webhook does: it hands over a letter and leaves. The reply comes later, through the outbox.</p>
-      <label class="lbl" for="text">The letter</label>
-      <textarea id="text" maxlength="500" placeholder="Try: Please refund order #B200, it never arrived">Hi, is my order on its way?</textarea>
-      <div class="row">
-        <label class="lbl" for="source" style="margin:0">From</label>
-        <select id="source"><option value="email">Email</option><option value="chat">Chat</option><option value="webhook">Webhook</option></select>
-        <button type="submit" class="go" id="send">Drop it in</button>
-        <button type="button" id="dup" disabled>Deliver the same letter again</button>
-      </div>
-      <div class="ack" id="ack" aria-live="polite"></div>
-    </form>
-  </section>
+
 
   <div class="desk-head" id="desk">
     <h2>The helper's desk</h2>
@@ -448,6 +475,24 @@
   </footer>
 </div>
 
+<button class="chat-btn" id="chatBtn" aria-expanded="false" aria-controls="chat" aria-label="Open the helper chat">
+  <svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></svg>
+  <span class="badge" id="chatBadge" hidden>0</span>
+</button>
+<section class="chat" id="chat" role="dialog" aria-label="Chat with the helper" hidden>
+  <header class="chat-head">
+    <div><b>The helper</b><span class="chat-sub">Writes back through its outbox</span></div>
+    <button class="chat-x" id="chatClose" aria-label="Close the chat">×</button>
+  </header>
+  <div class="chat-log" id="chatLog" aria-live="polite"></div>
+  <form class="chat-form" id="chatForm">
+    <label class="sr" for="chatText">Message the helper</label>
+    <textarea id="chatText" rows="2" maxlength="500" placeholder="Write to the helper. Try: Please refund order #B210"></textarea>
+    <button type="submit" class="go">Send</button>
+  </form>
+  <div class="chat-error" id="chatError" role="alert"></div>
+</section>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const untag = (s) => String(s ?? "").replace(/\[(email|chat|webhook|timer)\]\s*/g, "");
@@ -606,7 +651,7 @@ function testContext(t, s, lt) {
   const child = req ? lt.list.find((x) => x.causedBy === req) : null;
   const childOut = child?.requestId ? s.outbox.find((m) => m.requestId === child.requestId) : null;
   const alarm = req ? s.alarms.find((a) => a.from === req) : null;
-  if (approval && !run.form) { run.form = `Refund ${approval.input?.amountUsd} for order ${approval.input?.orderId}`; save("runs", runs); }
+  if (approval && !run.form) { run.form = `Refund $${approval.input?.amountUsd} for order ${approval.input?.orderId}`; save("runs", runs); }
   return { run, L, approval, outs, out, child, childOut, alarm, signedIt: !approval && signed.has(run.submissionId) };
 }
 
@@ -645,12 +690,13 @@ async function runTest(id) {
   try {
     const r = await api("POST", `/events/${sid}`, event);
     runs[id] = { submissionId: r.submissionId };
+    sentEvents[r.submissionId] = event; save("sent", sentEvents);
     say(`Test started: <b>${t.title.toLowerCase()}</b>. A letter from ${esc(event.source)} landed in the inbox.`);
     if (t.twice) {
       await new Promise((ok) => setTimeout(ok, 1200));
       const again = await api("POST", `/events/${sid}`, event);
       runs[id].dupIgnored = again.accepted === false && again.submissionId === r.submissionId;
-      if (runs[id].dupIgnored) { dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]); say("The same letter arrived again. Stamped <b>duplicate</b> and ignored."); }
+      if (runs[id].dupIgnored) { dupLog.push({ at: Date.now(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog); dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]); say("The same letter arrived again. Stamped <b>duplicate</b> and ignored."); }
     }
     save("runs", runs);
     track("test_run", { test: id });
@@ -660,24 +706,145 @@ async function runTest(id) {
 document.addEventListener("click", (e) => { const b = e.target.closest("[data-test]"); if (b) runTest(b.dataset.test); });
 
 // ---- Own letter -------------------------------------------------------------------
+// ---- Chat popover ----------------------------------------------------------------------
+// The whole conversation with the helper, in time order: your letters, its replies (from the
+// outbox), signature requests you can answer in place, and notes for alarms and duplicates.
+// The badge counts what the helper did while the chat was closed.
+let chatOpen = false;
+let seenChat = new Set(load("seenChat", []));
+let sentEvents = load("sent", {});  // submission id -> the event, for "Send again"
+let dupLog = load("dupLog", []);    // duplicates this browser caused
+let signLog = load("signLog", []);  // signatures given here
+let lastBadge = 0;
+
 async function send(event) {
-  $("ack").textContent = "Dropping it in…";
   try {
     const r = await api("POST", `/events/${sid}`, event);
-    lastEvent = event; $("dup").disabled = false;
-    if (r.accepted) { $("ack").textContent = "Got a ticket. Watch the Inbox tray."; say(`A letter from ${esc(event.source)} landed in the inbox.`); }
-    else {
+    if (r.accepted) {
+      sentEvents[r.submissionId] = event; save("sent", sentEvents);
+      say(`A letter from ${esc(event.source)} landed in the inbox.`);
+    } else {
       dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]);
-      $("ack").textContent = "Same letter as before, so it was stamped Duplicate and ignored.";
+      dupLog.push({ at: Date.now(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog);
       say("The same letter arrived again. Stamped <b>duplicate</b> and ignored.");
     }
     refresh();
-  } catch (e) { $("ack").textContent = e.message; track("ui_error", { where: "send", message: e.message }); }
+    return r;
+  } catch (e) {
+    chatError(e.message); track("ui_error", { where: "chat", message: e.message });
+  }
 }
-$("slotForm").onsubmit = (e) => { e.preventDefault(); send({ source: $("source").value, id: crypto.randomUUID().slice(0, 8), text: $("text").value }); };
-$("dup").onclick = () => lastEvent && send(lastEvent);
+function chatError(msg) { $("chatError").textContent = msg; setTimeout(() => ($("chatError").textContent = ""), 6000); }
+
+const srcWord = { email: "by email", chat: "in chat", webhook: "by webhook" };
+function chatItems(s, lt) {
+  const items = [];
+  const statusWord = { pending: "waiting its turn", running: "being worked on", completed: "done" };
+  for (const L of lt.list) {
+    if (L.parent) {
+      items.push({ t: L.createdAt, key: "rang:" + L.id, unread: true, html:
+        `<div class="note">The alarm set by letter ${L.parent} rang. It came in as ${tag(L.n)}</div>` });
+      continue;
+    }
+    const ev = sentEvents[L.id];
+    items.push({ t: L.createdAt, key: "me:" + L.id, html:
+      `<div class="msg me">${tag(L.n)}<span class="via">${srcWord[L.source] ?? esc(L.source ?? "")}</span>
+        <p>${esc(untag(L.text ?? ""))}</p>
+        <span class="meta-line">${statusWord[L.status] ?? esc(L.status)}${ev ? ` <button class="linkish" data-resend="${esc(L.id)}">Send again</button>` : ""}</span></div>` });
+  }
+  for (const d of dupLog) {
+    const L = lt.byId.get(d.submissionId);
+    items.push({ t: d.at, key: "dup:" + d.at, html:
+      `<div class="note">The same letter${L ? ` (letter ${L.n})` : ""} arrived again. Same id, so it was stamped <b>duplicate</b> and ignored.</div>` });
+  }
+  for (const g of signLog) {
+    const L = lt.byId.get(g.submissionId);
+    items.push({ t: g.at, key: "signed:" + g.at, html:
+      `<div class="note">${g.approve ? "You signed" : "You said no"}${L ? ` for letter ${L.n}` : ""}. The helper woke up to ${g.approve ? "finish" : "drop"} the job.</div>` });
+  }
+  for (const p of s.pendingApprovals) {
+    const L = lt.byReq.get(p.requestId); const i = p.input || {};
+    const what = p.action === "issue_refund" ? `a refund of $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
+    items.push({ t: (L?.createdAt ?? Date.now()) + 1, key: "sign:" + p.executionId, unread: true, html:
+      `<div class="msg helper ask">${L ? tag(L.n, "About letter " + L.n) : ""}
+        <p>I need your signature before I can issue ${what}. I'm going to sleep until you decide.</p>
+        <span class="row"><button class="sign" onclick="decide('${esc(p.executionId)}', true, '${esc(L?.id ?? "")}')">Sign it</button>
+        <button class="no" onclick="decide('${esc(p.executionId)}', false, '${esc(L?.id ?? "")}')">Say no</button></span></div>` });
+  }
+  for (const a of s.alarms) {
+    const L = lt.byReq.get(a.from);
+    items.push({ t: (L?.createdAt ?? Date.now()) + 2, key: "alarm:" + a.id, html:
+      `<div class="note">Alarm set${L ? ` for letter ${L.n}` : ""}. It rings in <b>${countdown(a)}</b>.</div>` });
+  }
+  for (const m of s.outbox) {
+    const L = lt.byReq.get(m.requestId) ?? lt.list.find((x) => x.n === refundOf[m.key]);
+    items.push({ t: m.createdAt ?? Date.now(), key: "out:" + m.key, unread: m.status === "sent", html:
+      `<div class="msg helper">${L ? tag(L.n, "Reply to letter " + L.n) : ""}<p>${esc(untag(m.body))}</p>
+        <span class="meta-line">${m.status === "sent" ? "sent through the outbox" : "queued in the outbox"}</span></div>` });
+  }
+  items.sort((a, b) => a.t - b.t);
+  if (s.busy) {
+    const w = s.workingOn ? lt.byReq.get(s.workingOn) : null;
+    items.push({ t: Infinity, key: "typing", html: `<div class="msg helper typing"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+      Working on ${w ? "letter " + w.n : "it"}…</div>` });
+  }
+  return items;
+}
+
+function renderChat(s, lt) {
+  const items = chatItems(s, lt);
+  if (chatOpen) { let changed = false; for (const it of items) if (it.unread && !seenChat.has(it.key)) { seenChat.add(it.key); changed = true; } if (changed) save("seenChat", [...seenChat]); }
+  const unread = items.filter((it) => it.unread && !seenChat.has(it.key)).length;
+  const badge = $("chatBadge");
+  badge.textContent = unread > 9 ? "9+" : String(unread);
+  badge.hidden = unread === 0;
+  if (unread > lastBadge) { badge.classList.remove("bump"); void badge.offsetWidth; badge.classList.add("bump"); }
+  lastBadge = unread;
+  $("chatBtn").setAttribute("aria-label", unread ? `Open the helper chat, ${unread} new` : "Open the helper chat");
+
+  const log = $("chatLog");
+  const html = items.length ? items.map((it) => it.html).join("")
+    : `<div class="note">Nothing here yet. Write to the helper below, or try one of these:</div>
+       <div class="starters"><button class="chip" data-start="Please refund order #B${200 + Math.floor(Math.random() * 700)}, it never arrived">Ask for a refund</button>
+       <button class="chip" data-start="Remind me to check the shipment in 15 seconds">Ask for a reminder</button>
+       <button class="chip" data-start="Hi, is my order on its way?">Ask a question</button></div>`;
+  if (log.dataset.html !== html) {
+    const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+    log.innerHTML = html; log.dataset.html = html;
+    if (nearBottom || !log.dataset.scrolled) { log.scrollTop = log.scrollHeight; log.dataset.scrolled = "1"; }
+  }
+}
+
+function setChat(open) {
+  chatOpen = open;
+  $("chat").hidden = !open;
+  $("chatBtn").setAttribute("aria-expanded", String(open));
+  document.body.classList.toggle("chat-open", open);
+  if (open) {
+    if (snap) renderChat(snap, letters(snap));
+    const log = $("chatLog"); log.scrollTop = log.scrollHeight;
+    $("chatText").focus();
+    track("chat_opened");
+  } else $("chatBtn").focus();
+}
+$("chatBtn").onclick = () => setChat(!chatOpen);
+$("chatClose").onclick = () => setChat(false);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && chatOpen) setChat(false); });
+$("chatForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $("chatText").value.trim(); if (!text) return;
+  $("chatText").value = "";
+  await send({ source: "chat", id: crypto.randomUUID().slice(0, 8), text });
+};
+$("chatText").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("chatForm").requestSubmit(); } });
+$("chatLog").addEventListener("click", (e) => {
+  const re = e.target.closest("[data-resend]"); if (re) { const ev = sentEvents[re.dataset.resend]; if (ev) send(ev); return; }
+  const st = e.target.closest("[data-start]"); if (st) { $("chatText").value = st.dataset.start; $("chatText").focus(); }
+});
+
 $("reset").onclick = () => {
-  sid = newId(); store.set("sid", sid); $("sid").textContent = sid; $("ack").textContent = "";
+  sid = newId(); store.set("sid", sid); $("sid").textContent = sid;
+  seenChat = new Set(); sentEvents = {}; dupLog = []; signLog = []; lastBadge = 0; const cl = $("chatLog"); cl.dataset.html = ""; cl.dataset.scrolled = "";
   relId = null; prev = null; firstPaint = true; said.length = 0; seen.clear();
   runs = {}; dupKeys = new Set(); signed = new Set(); refundOf = {};
   storyEmpty(); if (ph) { ph.reset(); ph.identify(sid); }
@@ -688,6 +855,8 @@ async function decide(id, approve, subId) {
   try {
     await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
     if (subId) { signed.add(subId); save("signed", [...signed]); }
+    // Keep the decision in the chat history once the request disappears.
+    signLog.push({ at: Date.now(), submissionId: subId, approve }); save("signLog", signLog);
     say(approve ? "You signed. The helper woke up to finish the job." : "You said no. The helper woke up and dropped the job.");
   } catch (e) { say(esc(e.message)); }
   refresh();
@@ -775,6 +944,7 @@ function render(s) {
   }).join("") : `<p class="line" style="color:var(--soft)">Blank page. It fills up as the helper works.</p>`);
 
   renderTests(s, lt);
+  renderChat(s, lt);
   paintClocks();
   lastBusy = !!s.busy || s.submissions.some((x) => x.status === "pending" || x.status === "running") || s.alarms.length > 0
     || Object.values(runs).some((r) => r.submissionId && !lt.byId.get(r.submissionId));
@@ -795,7 +965,7 @@ function paintClocks() {
   }).join("") : `<p class="empty" style="margin:0">No alarms set. The reminder test sets one.</p>`);
   if (trace) applyTrace(trace);
 }
-setInterval(() => { paintClocks(); if (snap) renderTests(snap, letters(snap)); }, 1000);
+setInterval(() => { paintClocks(); if (snap) { const lt = letters(snap); renderTests(snap, lt); renderChat(snap, lt); } }, 1000);
 
 // ---- Tracing: light up everything from one letter, across all boxes -------------------
 let trace = null;

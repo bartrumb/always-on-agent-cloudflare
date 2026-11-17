@@ -79,6 +79,13 @@ form, the outbox reply, the alarm, and the follow-up letter. The agent stamps ea
 with the run (`requestId`) that made it, and hovering any item lights up the rest of
 its chain.
 
+A round chat button in the corner holds the whole conversation in time order: your
+letters, the helper's replies (from the outbox), signature requests you can answer in
+place, and notes when an alarm is set or rings or a duplicate is ignored. Its badge
+counts what the helper did while the chat was closed, which is the point of an
+always-on agent: work keeps happening when nobody is looking. Each of your messages has
+a "Send again" link that resends the same event id, so you can try the duplicate check.
+
 Because anyone can use a public page, every run is kept small:
 
 - **Rate limit:** 10 model-waking requests a minute per IP (Workers Rate Limiting

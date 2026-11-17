@@ -137,7 +137,19 @@ export class Assistant extends Think<Env> {
   // ---- Human approval -------------------------------------------------------
   async decide(executionId: string, approve: boolean, reason?: string) {
     this.track(capture(this.env, "approval_decided", this.name, { approve }));
-    return approve ? this.approveExecution(executionId) : this.rejectExecution(executionId, reason ?? "Rejected");
+    if (approve) return this.approveExecution(executionId);
+    // A "no" is news too: tell the user through the outbox, tied to the run that asked.
+    const [pending] = await this.pendingApprovals(executionId);
+    const result = await this.rejectExecution(executionId, reason ?? "Rejected");
+    if (pending) {
+      const d = pending.descriptor;
+      const input = d.input as { orderId?: string } | undefined;
+      const body = d.action === "issue_refund" && input?.orderId
+        ? `Your refund for order ${input.orderId} was not approved, so I haven't issued it.`
+        : `"${d.summary}" was not approved, so I didn't do it.`;
+      this.enqueueOutbox(`declined:${executionId}`, "user", body, d.requestId);
+    }
+    return result;
   }
 
   // ---- Outbox ---------------------------------------------------------------

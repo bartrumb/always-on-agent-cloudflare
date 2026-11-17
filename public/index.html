@@ -417,7 +417,7 @@
     <h2>The grown-up version</h2>
     <p>Each part of the article, and the Cloudflare piece that does it.</p>
     <figure class="arch">
-      <a href="/architecture.png" target="_blank" rel="noopener"><img src="/architecture.png" width="1500" height="508" loading="lazy"
+      <a href="/architecture.svg" target="_blank" rel="noopener"><img src="/architecture.svg" width="1650" height="870" loading="lazy"
         alt="Architecture: event sources reach a Worker, which hands events to one Durable Object per user. Inside it, the inbox feeds runs; runs use memory, pause risky actions for approval, set timers that fire back into the inbox, and send through the outbox. Runs can also start a long Workflow."></a>
       <figcaption>How the pieces connect. Open the image for full size.</figcaption>
     </figure>
@@ -463,6 +463,7 @@
           <li><a href="https://github.com/colinhacks/zod" target="_blank" rel="noopener">colinhacks/zod</a>: tool input schemas</li>
           <li><a href="https://github.com/vercel-labs/just-bash" target="_blank" rel="noopener">vercel-labs/just-bash</a>: required by the Agents SDK bundle</li>
           <li><a href="https://github.com/PostHog/posthog-js" target="_blank" rel="noopener">PostHog/posthog-js</a> and <a href="https://posthog.com/docs/llm-analytics" target="_blank" rel="noopener">PostHog LLM analytics</a>: usage, replays and errors</li>
+          <li>Product icons in the diagram: <a href="https://github.com/cloudflare/cloudflare-docs/tree/production/src/icons" target="_blank" rel="noopener">Cloudflare docs</a>, CC BY 4.0</li>
           <li>Type: <a href="https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next" target="_blank" rel="noopener">Atkinson Hyperlegible Next</a> and <a href="https://fonts.google.com/specimen/Big+Shoulders+Stencil" target="_blank" rel="noopener">Big Shoulders Stencil</a></li>
         </ul>
       </div>
@@ -505,7 +506,7 @@ let sid = store.get("sid") || newId(); store.set("sid", sid);
 $("sid").textContent = sid;
 
 // Per-helper memory of what this browser did (tests run, duplicates seen, refunds signed).
-let runs = load("runs", {}), dupKeys = new Set(load("dups", [])), signed = new Set(load("signed", []));
+let runs = load("runs", {}), dupKeys = new Set(load("dups", [])), signed = new Set(load("signed", [])), declined = new Set(load("declined", []));
 let lastEvent = null, relId = store.get("rel:" + sid), prev = null, snap = null;
 
 // ---- PostHog (only when the Worker has a project token) --------------------------
@@ -592,19 +593,19 @@ const TESTS = [
     steps: [
       { label: "The letter lands in the Inbox tray and gets a ticket", done: (c) => !!c.L,
         detail: (c) => where("Inbox tray", ` letter ${c.L.n}, ${quote(c.L.text)}`) },
-      { label: "The helper reads it and fills in a refund form for you to sign", done: (c) => !!c.approval || !!c.out,
+      { label: "The helper reads it and fills in a refund form for you to sign", done: (c) => !!c.approval || !!c.out || c.saidNo,
         busy: (c) => working(c) && !c.approval,
         detail: (c) => c.approval
           ? where("Needs your signature", ` Refund $${esc(c.approval.input?.amountUsd)} for order ${esc(c.approval.input?.orderId)}. The helper went to sleep instead of waiting.`)
-          : where("Needs your signature", ` ${esc(c.run.form ?? "the form")}, now signed and filed.`) },
-      { label: "You sign it", done: (c) => c.signedIt || !!c.out,
+          : where("Needs your signature", ` ${esc(c.run.form ?? "the form")}, ${c.saidNo ? "turned down" : "now signed and filed"}.`) },
+      { label: "You sign it, or say no", done: (c) => c.signedIt || c.saidNo || !!c.out,
         action: (c) => c.approval ? where("Your turn", ` sign the form to wake the helper.
           <span class="row"><button class="sign" onclick="decide('${esc(c.approval.executionId)}', true, '${esc(c.L.id)}')">Sign it</button>
           <button class="no" onclick="decide('${esc(c.approval.executionId)}', false, '${esc(c.L.id)}')">Say no</button></span>`) : "",
-        detail: () => where("You", " signed. The helper woke up to finish.") },
-      { label: "The refund goes out through the Outbox tray, once", done: (c) => c.out?.status === "sent",
-        busy: (c) => (c.signedIt && !c.out) || working(c),
-        detail: (c) => where("Outbox tray", ` ${quote(c.out.body)} sent.`) }
+        detail: (c) => c.saidNo ? where("You", " said no. The helper woke up and dropped the job.") : where("You", " signed. The helper woke up to finish.") },
+      { label: "The result goes out through the Outbox tray, once", done: (c) => (c.saidNo ? c.declinedOut : c.out)?.status === "sent",
+        busy: (c) => ((c.signedIt || c.saidNo) && !(c.out || c.declinedOut)) || working(c),
+        detail: (c) => c.saidNo ? where("Outbox tray", ` ${quote(c.declinedOut.body)} sent. No refund was issued.`) : where("Outbox tray", ` ${quote(c.out.body)} sent.`) }
     ]
   },
   {
@@ -652,7 +653,9 @@ function testContext(t, s, lt) {
   const childOut = child?.requestId ? s.outbox.find((m) => m.requestId === child.requestId) : null;
   const alarm = req ? s.alarms.find((a) => a.from === req) : null;
   if (approval && !run.form) { run.form = `Refund $${approval.input?.amountUsd} for order ${approval.input?.orderId}`; save("runs", runs); }
-  return { run, L, approval, outs, out, child, childOut, alarm, signedIt: !approval && signed.has(run.submissionId) };
+  const declinedOut = outs.find((m) => m.key.startsWith("declined:"));
+  const saidNo = !approval && (declined.has(run.submissionId) || !!declinedOut);
+  return { run, L, approval, outs, out, child, childOut, alarm, declinedOut, saidNo, signedIt: !approval && !saidNo && signed.has(run.submissionId) };
 }
 
 // One slot per card, redrawn on its own, so a countdown in one card never replaces
@@ -680,7 +683,7 @@ function renderTests(s, lt) {
       <h3>${t.title}</h3><p class="proves">${t.proves}</p>
       <ol class="steps">${items}</ol>
       <div class="row"><button class="go" data-test="${t.id}">${c ? "Run it again" : "Run this test"}</button>
-      ${allDone ? `<span class="verdict ok">Passed: every step happened, in order.</span>` : ""}</div></article>`;
+      ${allDone ? `<span class="verdict ok">${c.saidNo ? "Passed: you said no, so nothing was issued, and the helper said so." : "Passed: every step happened, in order."}</span>` : ""}</div></article>`;
   })()));
 }
 
@@ -846,7 +849,7 @@ $("reset").onclick = () => {
   sid = newId(); store.set("sid", sid); $("sid").textContent = sid;
   seenChat = new Set(); sentEvents = {}; dupLog = []; signLog = []; lastBadge = 0; const cl = $("chatLog"); cl.dataset.html = ""; cl.dataset.scrolled = "";
   relId = null; prev = null; firstPaint = true; said.length = 0; seen.clear();
-  runs = {}; dupKeys = new Set(); signed = new Set(); refundOf = {};
+  runs = {}; dupKeys = new Set(); signed = new Set(); declined = new Set(); refundOf = {};
   storyEmpty(); if (ph) { ph.reset(); ph.identify(sid); }
   refresh();
 };
@@ -854,7 +857,7 @@ $("reset").onclick = () => {
 async function decide(id, approve, subId) {
   try {
     await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
-    if (subId) { signed.add(subId); save("signed", [...signed]); }
+    if (subId) { if (approve) { signed.add(subId); save("signed", [...signed]); } else { declined.add(subId); save("declined", [...declined]); } }
     // Keep the decision in the chat history once the request disappears.
     signLog.push({ at: Date.now(), submissionId: subId, approve }); save("signLog", signLog);
     say(approve ? "You signed. The helper woke up to finish the job." : "You said no. The helper woke up and dropped the job.");

@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1650 870" width="1650" height="870" role="img"
+  aria-label="Always-on agent on Cloudflare: events reach a Worker, which hands them to one Durable Object per user. Inside it the inbox feeds runs; runs use memory, wait for approval on risky actions, set alarms that come back as new events, and send through the outbox. Runs can start a long Workflow. Traces and logs cover every step.">
+<defs>
+  <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#8A8A8D"/></marker>
+  <marker id="headO" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#F38020"/></marker>
+</defs>
+<rect width="1650" height="870" fill="#FFFFFF"/>
+
+<text x="40" y="52" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#404041" text-anchor="start">Always-on agent on Cloudflare</text>
+<text x="40" y="80" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="400" fill="#6D6D6F" text-anchor="start">Anthropic's five pieces (inbox, timers, memory, permissions, outbox) on Workers, Durable Objects and Workflows.</text>
+
+<!-- Column 1: things that happen -->
+<text x="40" y="150" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#6D6D6F" text-anchor="start">Things that happen</text>
+<g><rect x="40" y="165" width="270" height="125" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="56" y="181" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="64.8" y="189.8" width="26.4" height="26.4" viewBox="0 0 48 48" fill="#fff" color="#fff"><path d="M42.038 10.568h-36l-1.5 1.5v23.864l1.5 1.5h36l1.5-1.5V12.068zm-18 15.397L10.005 13.568h28.072l-14.04 12.397ZM17.288 24l-9.75 8.61V15.36zm2.25 2.003 3.494 3.082h1.988l3.48-3.082 9.578 8.43H10.005zM30.788 24l9.75-8.61v17.25z"/></svg>
+  <text x="110" y="206" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Email, webhook, chat</text>
+  <text x="56" y="247" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Arrives at any time, and</text><text x="56" y="266" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">sometimes more than once</text></g>
+<g><rect x="40" y="440" width="270" height="125" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="56" y="456" width="44" height="44" rx="10" fill="#404041"/>
+  <circle cx="78" cy="472.72" r="6.16" fill="#fff"/>
+  <path d="M66.56 491.2 a11.440000000000001 9.68 0 0 1 22.880000000000003 0z" fill="#fff"/>
+  <text x="110" y="481" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">A person decides</text>
+  <text x="56" y="522" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Approves or rejects,</text><text x="56" y="541" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">hours or days later</text></g>
+
+<!-- Worker -->
+<g><rect x="380" y="300" width="250" height="125" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="396" y="316" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="404.8" y="324.8" width="26.4" height="26.4" viewBox="0 0 48 49" fill="#fff" color="#fff"><path d="m18.63 37.418-9.645-12.9 9.592-12.533-1.852-2.527L5.917 23.595l-.015 1.808 10.86 14.542z"/><path d="M21.997 6.503h-3.712l13.387 18.3-13.072 17.7h3.735L35.4 24.81z"/><path d="M29.175 6.503h-3.758l13.598 18.082-13.598 17.918h3.765l12.908-17.01v-1.808z"/></svg>
+  <text x="450" y="341" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Worker</text>
+  <text x="396" y="382" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Accepts the event and</text><text x="396" y="401" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">replies 202 right away</text></g>
+<path d="M310 228 C 345 228, 345 335, 378 335" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="293.8" y="262" width="102.4" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="345" y="276.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">POST /events</text>
+<path d="M310 502 C 345 502, 345 392, 378 392" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="283" y="442" width="124" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="345" y="456.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">POST /approvals</text>
+
+<!-- The Durable Object -->
+<rect x="690" y="120" width="690" height="580" rx="18" fill="#F2F2F2" stroke="#DEDEDE" stroke-width="1.5"/>
+<rect x="710" y="138" width="40" height="40" rx="10" fill="#F38020"/>
+  <svg x="718" y="146" width="24" height="24" viewBox="0 0 64 64" fill="#fff" color="#fff"><path fill="currentColor" fill-rule="evenodd" d="M32.214 6h-.202a26 26 0 1 0 .327 52q.266 0 .527-.014A26 26 0 0 0 58.012 32 26 26 0 0 0 32.865 6.014a10 10 0 0 0-.65-.013m-9.503 6.063A22 22 0 0 0 10.104 30h7.804q.068-1.79.252-3.51l3.998.24A46 46 0 0 0 21.91 30H30V10.519c-1.784.81-3.475 2.582-4.9 5.41q-.139.278-.274.567l-3.873-1.145q.276-.627.575-1.221c.363-.72.757-1.412 1.182-2.067M30 34h-8.09c.226 5.584 1.392 10.5 3.19 14.071 1.425 2.829 3.116 4.6 4.9 5.41zm-7.29 17.937a22 22 0 0 1-1.182-2.067c-2.131-4.233-3.393-9.795-3.62-15.87h-7.806A22 22 0 0 0 22.71 51.937m19.554-.472A22 22 0 0 0 53.921 34h-7.15a51 51 0 0 1-.26 3.589l-3.998-.24q.185-1.627.255-3.349H34v19.742c2.032-.641 3.973-2.486 5.577-5.671q.129-.255.252-.517l3.874 1.145q-.267.6-.553 1.171a23 23 0 0 1-.885 1.595M42.768 30H34V10.258c2.032.641 3.973 2.486 5.577 5.671 1.799 3.572 2.965 8.487 3.191 14.071m4.003 0c-.227-6.075-1.49-11.637-3.621-15.87a22 22 0 0 0-.885-1.595A22 22 0 0 1 53.921 30z" clip-rule="evenodd"/></svg>
+<text x="764" y="158" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#404041" text-anchor="start">Assistant: one Durable Object per user</text>
+<text x="764" y="179" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Think agent harness, everything saved in its own SQLite</text>
+
+<g><rect x="935" y="200" width="200" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="951" y="216" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="959.8" y="224.8" width="26.4" height="26.4" viewBox="0 0 65 64" fill="#fff" color="#fff"><path d="m23.6 22.2 3.03 1.75v3.5L23.6 29.2l-3.03-1.75v-3.5zM20.06 49l3.54-3.54L27.14 49l-3.54 3.54zm3.54-14.7c.593 0 1.17.176 1.67.506.493.33.878.798 1.1 1.35a3 3 0 0 1-.65 3.27c-.42.42-.954.705-1.54.821a3 3 0 0 1-1.73-.171 3.04 3.04 0 0 1-1.35-1.1 3 3 0 0 1-.506-1.67c0-.796.316-1.56.879-2.12a3 3 0 0 1 2.12-.879zM10.3 11.2l6.42-4.89 1.21-.37h29l1.19.39 6.61 4.89.82 1.61v38L55 52.21l-4.83 5.11-1.46.63h-31.7l-1.37-.54-5.48-5.11-.64-1.47v-38zm3.21 25.4 4.47 4.94h.056v4h-1.83l-2.7-3v7.39l4.26 4h30l3.7-3.91V42.3l-3.67 3.24h-18.6v-4h17.2l5.19-4.61v-7.44l-3.67 3.25h-18.7v-4h17.2l5.19-4.6v-6.92l-3.67 3.26h-31.6l-2.74-2.8v6.12l4.47 4.94h.056v4h-1.83l-2.7-3zm32.7-26.7h-27.6l-4.07 3.11 3.4 3.48h28.4l4-3.56z"/></svg>
+  <text x="1005" y="241" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Memory</text>
+  <text x="951" y="282" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Conversation and a</text><text x="951" y="301" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">memory block, in SQLite</text></g>
+<g><rect x="1160" y="200" width="200" height="118" rx="12" fill="#FEF3E8" stroke="#FAAE40" stroke-width="1.5"/>
+  <rect x="1176" y="216" width="44" height="44" rx="10" fill="#FAAE40"/>
+  <rect x="1190" y="228" width="6" height="20" rx="2" fill="#404041"/><rect x="1200" y="228" width="6" height="20" rx="2" fill="#404041"/>
+  <text x="1230" y="241" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Waits for you</text>
+  <text x="1176" y="282" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Risky action parks here.</text><text x="1176" y="301" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">The run ends.</text></g>
+<g><rect x="710" y="370" width="200" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="726" y="386" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="734.8" y="394.8" width="26.4" height="26.4" viewBox="0 0 40 40" fill="#fff" color="#fff"><path d="M11.154 19.894 5.33 14.21l-1.612 1.65 2.656 2.594H1.942a1.442 1.442 0 1 0 0 2.884h4.433L3.72 23.927l1.61 1.653 5.823-5.685Zm28.352 0-5.823-5.685-1.612 1.65 2.656 2.594h-4.433a1.442 1.442 0 1 0 0 2.884h4.433l-2.655 2.591 1.611 1.651z"/><rect width="23.07" height="2.884" x="7.911" y="7" rx="1.442"/><rect width="23.07" height="2.884" x="7.911" y="30.07" rx="1.442"/><path d="M13.679 14.21c.796 0 1.442.645 1.442 1.441v8.651a1.442 1.442 0 1 1-2.884 0v-8.65c0-.797.646-1.443 1.442-1.443Zm5.767 0c.797 0 1.442.645 1.442 1.441v8.651a1.442 1.442 0 1 1-2.884 0v-8.65c0-.797.646-1.443 1.442-1.443Zm5.768 0c.796 0 1.442.645 1.442 1.441v8.651a1.442 1.442 0 1 1-2.884 0v-8.65c0-.797.645-1.443 1.442-1.443Z"/></svg>
+  <text x="780" y="411" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Inbox</text>
+  <text x="726" y="452" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Same event id = one ticket.</text><text x="726" y="471" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Runs one at a time.</text></g>
+<g><rect x="935" y="370" width="200" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="951" y="386" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="959.8" y="394.8" width="26.4" height="26.4" viewBox="0 0 80 79" fill="#fff" color="#fff"><path d="M69.3 39.7c-3.1 0-5.8 2.1-6.7 5H48.3V34h4.6l4.5-2.5c1.1.8 2.5 1.2 3.9 1.2 3.8 0 7-3.1 7-7s-3.1-7-7-7-7 3.1-7 7c0 .9.2 1.8.5 2.6L51.9 30h-3.5V18.8h-.1c-1.3-1-2.9-1.6-4.5-1.9h-.2c-1.9-.3-3.9-.1-5.8.6-.4.1-.8.3-1.2.5h-.1c-.1.1-.2.1-.3.2-1.7 1-3 2.4-4 4 0 .1-.1.2-.1.2l-.3.6c0 .1-.1.1-.1.2v.1h-.6c-2.9 0-5.7 1.2-7.7 3.2-2.1 2-3.2 4.8-3.2 7.7 0 .7.1 1.4.2 2.1-1.3.9-2.4 2.1-3.2 3.5s-1.2 2.9-1.4 4.5c-.1 1.6.1 3.2.7 4.7s1.5 2.9 2.6 4c-.8 1.8-1.2 3.7-1.1 5.6 0 1.9.5 3.8 1.4 5.6s2.1 3.2 3.6 4.4c1.3 1 2.7 1.7 4.3 2.2v-.1q2.25.75 4.8.6h.1c0 .1.1.1.1.1.9 1.7 2.3 3 4 4 .1.1.2.1.3.2h.1c.4.2.8.4 1.2.5 1.4.6 3 .8 4.5.7.4 0 .8-.1 1.3-.1h.1c1.6-.3 3.1-.9 4.5-1.9V62.9h3.5l3.1 1.7c-.3.8-.5 1.7-.5 2.6 0 3.8 3.1 7 7 7s7-3.1 7-7-3.1-7-7-7c-1.5 0-2.8.5-3.9 1.2l-4.6-2.5h-4.6V48.7h14.3c.9 2.9 3.5 5 6.7 5 3.8 0 7-3.1 7-7s-3.1-7-7-7m-7.9-16.9c1.6 0 3 1.3 3 3s-1.3 3-3 3-3-1.3-3-3 1.4-3 3-3m0 41.4c1.6 0 3 1.3 3 3s-1.3 3-3 3-3-1.3-3-3 1.4-3 3-3M44.3 72c-.4.2-.7.3-1.1.3-.2 0-.4.1-.5.1h-.2c-.9.1-1.7 0-2.6-.3-1-.3-1.9-.9-2.7-1.7-.7-.8-1.3-1.7-1.6-2.7l-.3-1.5v-.7q0-.75.3-1.5c.1-.2.1-.4.2-.7s.3-.6.5-.9c0-.1.1-.1.1-.2.1-.1.1-.2.2-.3s.1-.2.2-.3c0 0 0-.1.1-.1l.6-.6-2.7-3.5c-1.3 1.1-2.3 2.4-2.9 3.9-.2.4-.4.9-.5 1.3v.1c-.1.2-.1.4-.1.6-.3 1.1-.4 2.3-.3 3.4-.3 0-.7 0-1-.1-2.2-.4-4.2-1.5-5.5-3.2-1.4-1.7-2-3.9-1.8-6.1q.15-1.2.6-2.4l.3-.6c.1-.2.2-.4.3-.5 0 0 0-.1.1-.1.4-.7.9-1.3 1.5-1.9 1.6-1.5 3.8-2.3 6-2.3q1.05 0 2.1.3v-4.5c-.7-.1-1.4-.2-2.1-.2-1.8 0-3.5.4-5.2 1.1-.7.3-1.3.6-1.9 1s-1.1.8-1.7 1.3c-.3.2-.5.5-.8.8-.6-.8-1-1.6-1.3-2.6-.2-1-.2-2 0-2.9.2-1 .6-1.9 1.3-2.6.6-.8 1.4-1.4 2.3-1.8l1.8-.9-.7-1.9c-.4-1-.5-2.1-.4-3.1s.5-2.1 1.1-2.9q.9-1.35 2.4-2.1c.9-.5 2-.8 3-.7.5 0 1 .1 1.5.2 1 .2 1.8.7 2.6 1.3s1.4 1.4 1.8 2.3l4.1-1.5c-.9-2-2.3-3.7-4.2-4.9q-.6-.3-.9-.6c.4-.7 1-1.4 1.6-1.9.8-.7 1.8-1.1 2.9-1.3.9-.2 1.7-.1 2.6 0 .4.1.7.2 1.1.3V72zm25-22.3c-1.6 0-3-1.3-3-3 0-1.6 1.3-3 3-3s3 1.3 3 3c0 1.6-1.3 3-3 3"/></svg>
+  <text x="1005" y="411" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Run</text>
+  <text x="951" y="452" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Claude Haiku 5.5</text><text x="951" y="471" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">with its tools</text></g>
+<g><rect x="1160" y="370" width="200" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="1176" y="386" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="1184.8" y="394.8" width="26.4" height="26.4" viewBox="0 0 48 48" fill="#fff" color="#fff"><path d="M42.038 10.568h-36l-1.5 1.5v23.864l1.5 1.5h36l1.5-1.5V12.068zm-18 15.397L10.005 13.568h28.072l-14.04 12.397ZM17.288 24l-9.75 8.61V15.36zm2.25 2.003 3.494 3.082h1.988l3.48-3.082 9.578 8.43H10.005zM30.788 24l9.75-8.61v17.25z"/></svg>
+  <text x="1230" y="411" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Outbox</text>
+  <text x="1176" y="452" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Every message leaves</text><text x="1176" y="471" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">here, exactly once</text></g>
+<g><rect x="935" y="545" width="200" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="951" y="561" width="44" height="44" rx="10" fill="#F38020"/>
+  <circle cx="973" cy="585" r="11.88" fill="none" stroke="#fff" stroke-width="3"/>
+  <path d="M973 585 v-7 M973 585 h6" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <path d="M960 574 l6 -5 M986 574 l-6 -5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+  <text x="1005" y="586" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Alarm</text>
+  <text x="951" y="627" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Wakes the agent later,</text><text x="951" y="646" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">on its own</text></g>
+
+<path d="M630 362 C 670 362, 675 429, 708 429" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="649.2" y="359" width="37.6" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="668" y="373.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">RPC</text>
+<path d="M910 429 L 933 429" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/>
+<path d="M1035 370 L 1035 320" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/>
+<path d="M1120 370 C 1135 350, 1160 345, 1185 320" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="1046.6" y="333" width="116.8" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="1105" y="347.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">needs a person</text>
+<path d="M1250 318 C 1250 350, 1190 360, 1137 392" fill="none" stroke="#F38020" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#headO)"/>
+<text x="1305" y="350" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#F38020" text-anchor="middle">approved or rejected</text>
+<path d="M1135 429 L 1158 429" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/>
+<path d="M1035 488 L 1035 543" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="980.2" y="505" width="109.60000000000001" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="1035" y="519.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">sets an alarm</text>
+<path d="M935 604 C 810 604, 810 540, 810 490" fill="none" stroke="#F38020" stroke-width="2.2" stroke-dasharray="7 6" marker-end="url(#headO)"/><rect x="755" y="619" width="160" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="835" y="633.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">rings as a new event</text>
+
+<!-- Right column -->
+<g><rect x="1425" y="370" width="190" height="118" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="1441" y="386" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="1449.8" y="394.8" width="26.4" height="26.4" viewBox="0 0 48 48" fill="#fff" color="#fff"><path d="M42 22.569h-6.082V18.06l-.435-1.054L23.535 4.97h-.005l-1.06-.44H7.53l-1.5 1.5v36l1.5 1.5h26.888l1.5-1.5v-4.461H42l1.5-1.5v-12zm-18.03-12.9 6.844 6.89H23.97zm8.948 30.861H9.03v-33h11.94v10.53l1.5 1.5h10.448v3.009H14.976l-1.5 1.5v12l1.5 1.5h17.942zm7.582-5.961H16.476v-9H40.5z"/><path d="M24.188 27.78h-3.203l-1.702 4.597h3.202zm6.75 0h-3.203l-1.702 4.597h3.202zm6.75 0h-3.203l-1.702 4.597h3.202z"/></svg>
+  <text x="1495" y="411" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Delivered</text>
+  <text x="1441" y="452" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Log or webhook,</text><text x="1441" y="471" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">with retries</text></g>
+<path d="M1360 429 L 1423 429" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/>
+<g><rect x="1415" y="560" width="200" height="137" rx="12" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+  <rect x="1431" y="576" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="1439.8" y="584.8" width="26.4" height="26.4" viewBox="0 0 48 49" fill="#fff" color="#fff"><path d="m18.63 37.418-9.645-12.9 9.592-12.533-1.852-2.527L5.917 23.595l-.015 1.808 10.86 14.542z"/><path d="M21.997 6.503h-3.712l13.387 18.3-13.072 17.7h3.735L35.4 24.81z"/><path d="M29.175 6.503h-3.758l13.598 18.082-13.598 17.918h3.765l12.908-17.01v-1.808z"/></svg>
+  <text x="1485" y="601" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#404041" text-anchor="start">Workflow</text>
+  <text x="1431" y="642" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">Long job that waits for</text><text x="1431" y="661" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">approval. Add steps,</text><text x="1431" y="680" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="400" fill="#6D6D6F" text-anchor="start">never rename them.</text></g>
+<path d="M1110 488 C 1200 560, 1290 630, 1413 628" fill="none" stroke="#8A8A8D" stroke-width="2.2"  marker-end="url(#head)"/><rect x="1235.2" y="599" width="109.60000000000001" height="20" rx="10" fill="#FFFFFF" stroke="#DEDEDE"/>
+    <text x="1290" y="613.5" font-family="Arial, Helvetica, sans-serif" font-size="12.5" font-weight="400" fill="#404041" text-anchor="middle">runWorkflow()</text>
+
+<!-- Observability -->
+<rect x="40" y="745" width="1575" height="92" rx="14" fill="#FFFFFF" stroke="#DEDEDE" stroke-width="1.5"/>
+<rect x="56" y="769" width="44" height="44" rx="10" fill="#F38020"/>
+  <svg x="64.8" y="777.8" width="26.4" height="26.4" viewBox="0 0 48 48" fill="#fff" color="#fff"><path d="M42 22.569h-6.082V18.06l-.435-1.054L23.535 4.97h-.005l-1.06-.44H7.53l-1.5 1.5v36l1.5 1.5h26.888l1.5-1.5v-4.461H42l1.5-1.5v-12zm-18.03-12.9 6.844 6.89H23.97zm8.948 30.861H9.03v-33h11.94v10.53l1.5 1.5h10.448v3.009H14.976l-1.5 1.5v12l1.5 1.5h17.942zm7.582-5.961H16.476v-9H40.5z"/><path d="M24.188 27.78h-3.203l-1.702 4.597h3.202zm6.75 0h-3.203l-1.702 4.597h3.202zm6.75 0h-3.203l-1.702 4.597h3.202z"/></svg>
+<text x="116" y="787" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#404041" text-anchor="start">Watching it: Cloudflare traces and logs on every request, run, tool call and alarm</text>
+<text x="116" y="811" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="400" fill="#6D6D6F" text-anchor="start">PostHog adds traffic, session replays, one $ai_generation event per model call, and errors</text>
+</svg>

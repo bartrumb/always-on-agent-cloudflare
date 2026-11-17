@@ -26,13 +26,10 @@ npm run demo        # or: scripted end-to-end run with checks; no API key needed
 | **Permissions**: risky actions wait for a human | A `kind: "durable-pause"` action. The run *ends*; nothing waits in memory. `approveExecution()` later runs the action and continues the conversation. | `issue_refund`, `Assistant.decide()` |
 | **Outbox**: side effects leave through one door, once | *Not in Think, so it lives here:* an `app_outbox` table keyed by idempotency key, delivered on the alarm with retries (log or webhook) | `enqueueOutbox()`, `dispatchOutbox()` |
 
-![Architecture: event sources reach a Worker, which hands events to one Durable Object per user. Inside it, the inbox feeds runs; runs use memory, pause risky actions for approval, set timers that fire back into the inbox, and send through the outbox. Runs can also start a long Workflow.](public/architecture.png)
+![Architecture: event sources reach a Worker, which hands events to one Durable Object per user. Inside it, the inbox feeds runs; runs use memory, pause risky actions for approval, set timers that fire back into the inbox, and send through the outbox. Runs can also start a long Workflow.](public/architecture.svg)
 
-The diagram is drawn from [`docs/architecture.mmd`](docs/architecture.mmd). To redraw it after editing:
-
-```bash
-npx -p @mermaid-js/mermaid-cli@12.2.0 mmdc -i docs/architecture.mmd -o public/architecture.png -c docs/mermaid.config.json -b white --size 3000
-```
+The diagram is plain SVG built by `node docs/build-diagram.mjs` from Cloudflare's product icons
+(in `docs/icons`, from the Cloudflare docs, CC BY 4.0).
 
 ## What the demo shows
 
@@ -154,7 +151,7 @@ src/release-workflow.ts  ReleaseWorkflow (ThinkWorkflow): deploy-safety demo
 src/mock-model.ts        scripted model for keyless runs
 src/telemetry.ts         PostHog capture (LLM generations, errors)
 public/index.html        one-page UI
-public/architecture.png  architecture diagram (from docs/architecture.mmd)
+public/architecture.svg  architecture diagram (built by docs/build-diagram.mjs)
 scripts/demo.mjs         end-to-end demo and checks
 ```
 
@@ -182,4 +179,5 @@ The idea, and every project this demo is built on.
 - [colinhacks/zod](https://github.com/colinhacks/zod): tool input schemas
 - [vercel-labs/just-bash](https://github.com/vercel-labs/just-bash): required by the Agents SDK bundle
 - [PostHog/posthog-js](https://github.com/PostHog/posthog-js) and [PostHog LLM analytics](https://posthog.com/docs/llm-analytics): usage, replays and errors
+- Product icons: [cloudflare/cloudflare-docs](https://github.com/cloudflare/cloudflare-docs/tree/production/src/icons), CC BY 4.0
 - Type: [Atkinson Hyperlegible Next](https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next) and [Big Shoulders Stencil](https://fonts.google.com/specimen/Big+Shoulders+Stencil)

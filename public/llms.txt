@@ -1,0 +1,41 @@
+# Always-on agent on Cloudflare
+
+> A small, runnable reference for Anthropic's article "Building always-on agents", built on Cloudflare Workers, Durable Objects, Workflows and the Think agent harness. Each of the article's five parts (event inbox, timers, memory, permissions, outbox) is shown as working, commented TypeScript. MIT licensed. The live demo is a toy helper desk: orders and refunds are made up, and nothing real is sent.
+
+The article describes what an agent needs once it stops living in a chat window and starts reacting to events. It has no code and names no platform. This repo maps each part to a Cloudflare primitive and adds only what is missing (the outbox).
+
+How the five parts map:
+
+- Event inbox: Think `submitMessages()` with an idempotency key (source + event id). Durable, first in first out, one turn at a time per user, never twice. See `Assistant.ingest()` in `src/agent.ts`.
+- Timers: Agent `schedule()`, backed by the Durable Object alarm. A timer firing comes back through the inbox like any other event.
+- Memory and task progress: Think Sessions (the transcript in the Durable Object's SQLite) plus a memory block the model can rewrite.
+- Permissions: risky tools (here `issue_refund`) are a `durable-pause` action. The run ends and nothing waits in memory; a human's approve or reject later resumes it.
+- Outbox: an `app_outbox` table keyed by idempotency key, delivered on the alarm with retries, so a retried run never sends twice. Not in Think, so it lives in this repo.
+
+One Durable Object per visitor (per browser session) holds that visitor's agent. A separate Cloudflare Workflow shows deploy safety: step names are cache keys, so add steps and don't rename them. The model is Claude Haiku 5.5; without an API key a scripted stand-in model runs instead, so the demo works offline and for free.
+
+## Try it
+
+- [Live demo](https://always-on-agent.shopdawg.workers.dev/): one-page UI drawn as a helper's desk. Send a letter, sign or decline a refund, set a 15-second alarm, or send the same email twice.
+- [Walkthrough video](https://always-on-agent.shopdawg.workers.dev/walkthrough): two minutes, narrated, with captions.
+
+## Code
+
+- [GitHub repository](https://github.com/bartrumb/always-on-agent-cloudflare): source, README, and a Deploy to Cloudflare button.
+- [README](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/README.md): the full mapping, lessons learned, cost guards and observability.
+- [src/index.ts](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/src/index.ts): the Worker, the front door. Accept fast, hand off to that user's agent, reply.
+- [src/agent.ts](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/src/agent.ts): the agent. Inbox, timers, memory, approvals and the outbox.
+- [src/release-workflow.ts](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/src/release-workflow.ts): the Workflow and why renaming a step re-runs it.
+- [scripts/demo.mjs](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/scripts/demo.mjs): the whole story as an end-to-end test over HTTP.
+
+## Background
+
+- [Building always-on agents (Anthropic)](https://claude.com/resources/articles/building-always-on-agents): the article this implements.
+- [Think agent harness (Cloudflare docs)](https://developers.cloudflare.com/agents/harnesses/think/)
+- [Durable Objects (Cloudflare docs)](https://developers.cloudflare.com/durable-objects/)
+- [Workflows (Cloudflare docs)](https://developers.cloudflare.com/workflows/)
+
+## Optional
+
+- [LinkedIn post](https://www.linkedin.com/feed/update/urn:li:activity:7528552400182423553/): the story behind the project.
+- [src/telemetry.ts](https://github.com/bartrumb/always-on-agent-cloudflare/blob/main/src/telemetry.ts): PostHog LLM analytics from a Worker with plain fetch, no SDK.

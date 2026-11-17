@@ -32,7 +32,22 @@
   .wrap { max-width: 1160px; margin: 0 auto; padding: 40px 16px 64px; }
 
   /* Hero */
-  .hero { display: grid; gap: 32px; grid-template-columns: 1.1fr 1fr; align-items: start; }
+  .hero { max-width: 760px; }
+  .statusbar { position: sticky; top: 0; z-index: 10; background: var(--paper); border-bottom: 3px solid var(--orange); }
+  .sb-inner { max-width: 1160px; margin: 0 auto; padding: 8px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: 15px; }
+  .sb-lamp { display: flex; align-items: center; gap: 8px; }
+  .sb-lamp .bulb { width: 16px; height: 16px; }
+  .statusbar.on .bulb { background: var(--lamp); box-shadow: 0 0 0 5px color-mix(in srgb, var(--lamp) 30%, transparent); }
+  .sb-counts { color: var(--soft); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+  .sb-counts b { color: var(--ink); }
+  .sb-link { margin-left: auto; font-weight: 600; }
+  .own { margin-top: 40px; max-width: 760px; }
+  .step-detail { display: block; margin-top: 4px; padding: 6px 8px; border-radius: 3px; background: var(--desk); color: var(--ink); font-weight: 400; font-size: 14px; overflow-wrap: anywhere; }
+  .step-detail .where { font-weight: 800; color: var(--red); margin-right: 4px; }
+  .step-detail .row { margin-top: 6px; }
+  .working-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--lamp); margin-right: 6px; animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .working-dot { animation: none; } }
   h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 18px; font-weight: 800; max-width: 14ch; }
   .lede { font-size: 19px; max-width: 34em; margin: 0 0 14px; }
   .small { color: var(--soft); font-size: 15px; margin: 0; max-width: 40em; }
@@ -173,7 +188,8 @@
   .tests h2 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.01em; }
   .tests > p { margin: 0 0 16px; color: var(--soft); max-width: 60ch; }
   .tgrid { display: grid; gap: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .test { background: var(--paper); border-radius: 4px; padding: 18px; border-left: 5px solid var(--orange); display: flex; flex-direction: column; }
+  #tests > div { display: flex; }
+  .test { flex: 1; background: var(--paper); border-radius: 4px; padding: 18px; border-left: 5px solid var(--orange); display: flex; flex-direction: column; }
   .test h3 { margin: 0 0 4px; font-size: 19px; }
   .test .proves { margin: 0 0 12px; font-size: 15px; }
   .test .proves b { font-weight: 800; }
@@ -202,11 +218,13 @@
 
   @media (max-width: 900px) {
     .tgrid { grid-template-columns: 1fr; }
-    .hero, .log, .chore, .sources .cols { grid-template-columns: 1fr; }
+    .log, .chore, .sources .cols { grid-template-columns: 1fr; }
     .desk { grid-template-columns: 1fr 1fr; }
   }
   @media (max-width: 620px) {
-    .wrap { padding-top: 28px; }
+    .wrap { padding-top: 20px; }
+    .sb-link { margin-left: 0; }
+    .sb-inner { font-size: 14px; }
     .desk { grid-template-columns: 1fr; }
     .tray { box-shadow: 3px 3px 0 var(--desk-deep), 6px 6px 0 var(--rule); }
     .table-wrap { overflow-x: auto; }
@@ -215,6 +233,13 @@
 </style>
 </head>
 <body>
+<div class="statusbar" id="statusbar" role="status" aria-live="polite">
+  <div class="sb-inner">
+    <span class="sb-lamp"><span class="bulb" aria-hidden="true"></span><b id="sbState">Helper asleep</b></span>
+    <span class="sb-counts" id="sbCounts"></span>
+    <a href="#desk" class="sb-link">See the desk</a>
+  </div>
+</div>
 <div class="wrap">
 
   <section class="hero">
@@ -224,7 +249,7 @@
         happening: an email arrives, an alarm rings, a person says yes. Between jobs it sleeps and costs nothing.</p>
       <p class="small">It's a working copy of Anthropic's
         <a href="https://claude.com/resources/articles/building-always-on-agents" target="_blank" rel="noopener">Building always-on agents</a>,
-        running on Cloudflare. Run one of the tests below and watch the helper's desk.
+        running on Cloudflare. Run a test below to see it work.
         <a href="https://github.com/bartrumb/always-on-agent-cloudflare" target="_blank" rel="noopener">Read the code on GitHub</a>.</p>
       <div class="meta">
         <span>Your helper: <b id="sid"></b></span>
@@ -233,6 +258,17 @@
       </div>
     </div>
 
+
+  </section>
+
+  <section class="tests" aria-labelledby="tests-h">
+    <h2 id="tests-h">Run a test</h2>
+    <p>Each test sends one letter. Its steps fill in right here as the letter moves across the helper's desk,
+      and when it's your turn, the button appears in the step. The bar at the top shows when the helper is working.</p>
+    <div class="tgrid" id="tests"></div>
+  </section>
+
+  <section class="own">
     <form class="slot" id="slotForm">
       <h2>Or write your own letter</h2>
       <p>This is what a webhook does: it hands over a letter and leaves. The reply comes later, through the outbox.</p>
@@ -248,16 +284,9 @@
     </form>
   </section>
 
-  <section class="tests" aria-labelledby="tests-h">
-    <h2 id="tests-h">Run a test</h2>
-    <p>Each test sends one letter and checks off what should happen, live, as the desk below changes.
-      Hover over or tab to any item on the desk to light up everything that came from the same letter.</p>
-    <div class="tgrid" id="tests"></div>
-  </section>
-
-  <div class="desk-head">
+  <div class="desk-head" id="desk">
     <h2>The helper's desk</h2>
-    <p>Every letter gets a number. Everything it causes, in any box, carries that number.</p>
+    <p>The full view. Every letter gets a number, and everything it causes carries that number. On a computer, hover over an item to light up its whole chain.</p>
   </div>
 
   <section class="desk">
@@ -499,16 +528,38 @@ const empty = (t) => `<li class="empty">${t}</li>`;
 const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
 
 // ---- Guided tests ---------------------------------------------------------------
+// Each step says what should happen and, once it has, shows what actually happened and
+// in which box, so the whole chain reads top to bottom inside the card (good on phones).
+const where = (box, html) => `<span class="step-detail"><span class="where">${box}:</span>${html}</span>`;
+const working = (c) => c.L?.status === "running" || (snap?.workingOn && snap.workingOn === c.L?.requestId);
+const busyNote = `<span class="step-detail"><span class="working-dot" aria-hidden="true"></span>The helper is working on it now.</span>`;
+const quote = (s) => `“${esc(untag(s))}”`;
+const countdown = (a) => {
+  const at = a.at < 1e12 ? a.at * 1000 : a.at; const secs = Math.max(0, Math.round((at - Date.now()) / 1000));
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+};
+
 const TESTS = [
   {
     id: "refund", title: "A risky job waits for a person",
     proves: "<b>Permissions.</b> The helper stops and sleeps until someone signs, then finishes the job.",
     letter: () => ({ source: "email", text: `Please refund order #A${100 + Math.floor(Math.random() * 900)}, it arrived broken` }),
     steps: [
-      ["The letter gets a ticket in the Inbox tray", (c) => !!c.L],
-      ["The helper asks for a signature in the yellow folder, then goes to sleep", (c) => !!c.approval || !!c.out],
-      ["You sign it", (c) => c.signedIt || !!c.out, "Your turn: click Sign it in the yellow Needs your signature folder."],
-      ["The refund message goes out through the Outbox tray", (c) => c.out?.status === "sent"]
+      { label: "The letter lands in the Inbox tray and gets a ticket", done: (c) => !!c.L,
+        detail: (c) => where("Inbox tray", ` letter ${c.L.n}, ${quote(c.L.text)}`) },
+      { label: "The helper reads it and fills in a refund form for you to sign", done: (c) => !!c.approval || !!c.out,
+        busy: (c) => working(c) && !c.approval,
+        detail: (c) => c.approval
+          ? where("Needs your signature", ` Refund $${esc(c.approval.input?.amountUsd)} for order ${esc(c.approval.input?.orderId)}. The helper went to sleep instead of waiting.`)
+          : where("Needs your signature", ` ${esc(c.run.form ?? "the form")}, now signed and filed.`) },
+      { label: "You sign it", done: (c) => c.signedIt || !!c.out,
+        action: (c) => c.approval ? where("Your turn", ` sign the form to wake the helper.
+          <span class="row"><button class="sign" onclick="decide('${esc(c.approval.executionId)}', true, '${esc(c.L.id)}')">Sign it</button>
+          <button class="no" onclick="decide('${esc(c.approval.executionId)}', false, '${esc(c.L.id)}')">Say no</button></span>`) : "",
+        detail: () => where("You", " signed. The helper woke up to finish.") },
+      { label: "The refund goes out through the Outbox tray, once", done: (c) => c.out?.status === "sent",
+        busy: (c) => (c.signedIt && !c.out) || working(c),
+        detail: (c) => where("Outbox tray", ` ${quote(c.out.body)} sent.`) }
     ]
   },
   {
@@ -517,9 +568,13 @@ const TESTS = [
     letter: () => ({ source: "email", text: "Hi, is my order on its way?" }),
     twice: true,
     steps: [
-      ["The first copy gets a ticket", (c) => !!c.L],
-      ["The second copy is recognized and stamped Duplicate", (c) => c.run.dupIgnored === true],
-      ["Exactly one reply goes out through the Outbox tray", (c) => c.outs.length === 1 && c.outs[0].status === "sent"]
+      { label: "The first copy lands in the Inbox tray and gets a ticket", done: (c) => !!c.L,
+        detail: (c) => where("Inbox tray", ` letter ${c.L.n}, ${quote(c.L.text)}`) },
+      { label: "A second copy arrives a moment later", done: (c) => c.run.dupIgnored === true,
+        detail: (c) => where("Inbox tray", ` same email id as letter ${c.L.n}, so it's stamped Duplicate and ignored. No second ticket.`) },
+      { label: "Exactly one reply goes out", done: (c) => c.outs.length === 1 && c.outs[0].status === "sent",
+        busy: (c) => working(c),
+        detail: (c) => where("Outbox tray", ` 1 reply, ${quote(c.outs[0].body)}`) }
     ]
   },
   {
@@ -527,10 +582,16 @@ const TESTS = [
     proves: "<b>Timers.</b> The helper sets an alarm and sleeps. The alarm wakes it with a new letter.",
     letter: () => ({ source: "chat", text: "Remind me to check the shipment in 15 seconds" }),
     steps: [
-      ["The letter gets a ticket", (c) => !!c.L],
-      ["The helper sets an alarm in Alarm clocks, then sleeps", (c) => c.alarm || !!c.child],
-      ["About 15 seconds later the alarm rings and drops a new letter in the Inbox tray", (c) => !!c.child, "Watch the countdown in Alarm clocks."],
-      ["The follow-up goes out through the Outbox tray", (c) => c.childOut?.status === "sent"]
+      { label: "The letter lands in the Inbox tray and gets a ticket", done: (c) => !!c.L,
+        detail: (c) => where("Inbox tray", ` letter ${c.L.n}, ${quote(c.L.text)}`) },
+      { label: "The helper sets an alarm, then goes to sleep", done: (c) => !!c.alarm || !!c.child,
+        busy: (c) => working(c),
+        detail: (c) => c.alarm ? where("Alarm clocks", ` rings in <b>${countdown(c.alarm)}</b>. The helper is asleep, costing nothing.`) : where("Alarm clocks", " rang.") },
+      { label: "The alarm rings and drops a new letter in the Inbox tray", done: (c) => !!c.child,
+        detail: (c) => where("Inbox tray", ` letter ${c.child.n}, ${quote(c.child.text)}`) },
+      { label: "The follow-up goes out through the Outbox tray", done: (c) => c.childOut?.status === "sent",
+        busy: (c) => !!c.child && !c.childOut,
+        detail: (c) => where("Outbox tray", ` ${quote(c.childOut.body)} sent.`) }
     ]
   }
 ];
@@ -539,33 +600,43 @@ function testContext(t, s, lt) {
   const run = runs[t.id]; if (!run) return null;
   const L = lt.byId.get(run.submissionId);
   const req = L?.requestId;
-  const approval = req && s.pendingApprovals.find((p) => p.requestId === req);
+  const approval = req ? s.pendingApprovals.find((p) => p.requestId === req) : null;
   const outs = req ? s.outbox.filter((m) => m.requestId === req) : [];
-  const out = outs.find((m) => m.key.startsWith("refund:")) ?? (t.id === "refund" ? null : outs[0]);
-  const child = req && lt.list.find((x) => x.causedBy === req);
-  const childOut = child?.requestId && s.outbox.find((m) => m.requestId === child.requestId);
-  const alarm = req && s.alarms.some((a) => a.from === req);
-  return { run, L, approval, outs, out, child, childOut, alarm, signedIt: approval ? false : signed.has(run.submissionId) };
+  const out = t.id === "refund" ? outs.find((m) => m.key.startsWith("refund:")) : outs[0];
+  const child = req ? lt.list.find((x) => x.causedBy === req) : null;
+  const childOut = child?.requestId ? s.outbox.find((m) => m.requestId === child.requestId) : null;
+  const alarm = req ? s.alarms.find((a) => a.from === req) : null;
+  if (approval && !run.form) { run.form = `Refund ${approval.input?.amountUsd} for order ${approval.input?.orderId}`; save("runs", runs); }
+  return { run, L, approval, outs, out, child, childOut, alarm, signedIt: !approval && signed.has(run.submissionId) };
 }
 
+// One slot per card, redrawn on its own, so a countdown in one card never replaces
+// the buttons in another while someone is tapping them.
 function renderTests(s, lt) {
-  put("tests", TESTS.map((t) => {
+  const box = $("tests");
+  if (!box.children.length) box.innerHTML = TESTS.map((t) => `<div id="test-${t.id}"></div>`).join("");
+  TESTS.forEach((t) => put("test-" + t.id, (() => {
     const c = s ? testContext(t, s, lt) : null;
     let nowSet = false;
-    const items = t.steps.map(([label, check, hint]) => {
-      const done = c ? !!check(c) : false;
-      let cls = done ? "done" : "";
-      if (c && !done && !nowSet) { cls = "now"; nowSet = true; }
-      return `<li class="${cls}"><span class="box"></span><span>${label}${cls === "now" && hint ? `<span class="hint">${hint}</span>` : ""}</span></li>`;
+    const items = t.steps.map((step) => {
+      const done = c?.L ? !!step.done(c) : false;
+      let cls = done ? "done" : "", extra = "";
+      if (done && step.detail) extra = step.detail(c);
+      else if (c && !nowSet) {
+        cls = "now"; nowSet = true;
+        if (step.action) extra = step.action(c);
+        if (!extra && step.busy && c.L && step.busy(c)) extra = busyNote;
+        if (!extra && !c.L) extra = busyNote;
+      }
+      return `<li class="${cls}"><span class="box"></span><span>${step.label}${extra}</span></li>`;
     }).join("");
-    const allDone = c && t.steps.every(([, check]) => check(c));
-    const letter = c?.L ? `<p class="letter">${tag(c.L.n)}“${esc(untag(c.L.text))}”<small>Sent from ${esc(c.L.source)}</small></p>` : "";
+    const allDone = c?.L && t.steps.every((st) => st.done(c));
     return `<article class="test"${c?.L ? ` data-root="${c.L.root}"` : ""}>
-      <h3>${t.title}</h3><p class="proves">${t.proves}</p>${letter}
+      <h3>${t.title}</h3><p class="proves">${t.proves}</p>
       <ol class="steps">${items}</ol>
       <div class="row"><button class="go" data-test="${t.id}">${c ? "Run it again" : "Run this test"}</button>
-      ${allDone ? `<span class="verdict ok">Passed</span>` : ""}</div></article>`;
-  }).join(""));
+      ${allDone ? `<span class="verdict ok">Passed: every step happened, in order.</span>` : ""}</div></article>`;
+  })()));
 }
 
 async function runTest(id) {
@@ -659,6 +730,15 @@ function render(s) {
   const working = s.workingOn ? lt.byReq.get(s.workingOn) : null;
   $("helper").classList.toggle("on", !!s.busy);
   $("lampText").textContent = s.busy ? "Working" : "Asleep";
+  $("statusbar").classList.toggle("on", !!s.busy);
+  $("sbState").innerHTML = s.busy ? (working ? `Helper working on letter ${working.n}` : "Helper working") : "Helper asleep";
+  const waiting = s.submissions.filter((x) => x.status === "pending" || x.status === "running").length;
+  const sent = s.outbox.filter((m) => m.status === "sent").length;
+  $("sbCounts").innerHTML = [
+    `Letters <b>${s.submissions.length}</b>`, waiting ? `In line <b>${waiting}</b>` : "",
+    s.pendingApprovals.length ? `To sign <b>${s.pendingApprovals.length}</b>` : "",
+    s.alarms.length ? `Alarms <b>${s.alarms.length}</b>` : "", `Sent <b>${sent}</b>`
+  ].filter(Boolean).map((x) => `<span>${x}</span>`).join("");
   $("lampWhat").innerHTML = s.busy ? (working ? `On ${tag(working.n)}` : "Finishing a job") : "Waiting for the next letter, using no compute.";
 
   const statusWord = { pending: "Waiting its turn", running: "Being worked on", completed: "Done", error: "Failed", aborted: "Cancelled", skipped: "Skipped" };
@@ -696,6 +776,8 @@ function render(s) {
 
   renderTests(s, lt);
   paintClocks();
+  lastBusy = !!s.busy || s.submissions.some((x) => x.status === "pending" || x.status === "running") || s.alarms.length > 0
+    || Object.values(runs).some((r) => r.submissionId && !lt.byId.get(r.submissionId));
   if (trace) applyTrace(trace);
   prev = s; firstPaint = false;
 }
@@ -713,7 +795,7 @@ function paintClocks() {
   }).join("") : `<p class="empty" style="margin:0">No alarms set. The reminder test sets one.</p>`);
   if (trace) applyTrace(trace);
 }
-setInterval(paintClocks, 1000);
+setInterval(() => { paintClocks(); if (snap) renderTests(snap, letters(snap)); }, 1000);
 
 // ---- Tracing: light up everything from one letter, across all boxes -------------------
 let trace = null;
@@ -724,7 +806,12 @@ function setTrace(root) {
   trace = root; document.body.classList.toggle("tracing", !!root);
   if (root) applyTrace(root); else document.querySelectorAll(".lit").forEach((el) => el.classList.remove("lit"));
 }
-for (const ev of ["mouseover", "focusin"]) document.addEventListener(ev, (e) => { const el = e.target.closest?.("[data-root]"); setTrace(el ? el.dataset.root : null); });
+// Only where a pointer can hover (or for keyboard focus): on touch screens a tap would
+// leave everything else faded, and the test cards already show each chain inline.
+const canHover = matchMedia("(hover: hover)").matches;
+const traceFrom = (e) => { const el = e.target.closest?.("[data-root]"); setTrace(el ? el.dataset.root : null); };
+if (canHover) document.addEventListener("mouseover", traceFrom);
+document.addEventListener("focusin", (e) => { if (canHover || e.target.matches?.(":focus-visible")) traceFrom(e); });
 
 // ---- Release chore ------------------------------------------------------------------------
 async function refreshRelease() {
@@ -763,7 +850,10 @@ async function refresh() {
 storyEmpty();
 renderTests(null);
 refresh();
-setInterval(() => { if (!document.hidden) refresh(); }, 1500);
+let lastBusy = false;
+(function loop() {
+  setTimeout(async () => { if (!document.hidden) await refresh(); loop(); }, lastBusy ? 600 : 1500);
+})();
 </script>
 </body>
 </html>

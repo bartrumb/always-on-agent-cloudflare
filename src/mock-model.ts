@@ -46,6 +46,8 @@ function decide(prompt: Array<{ role: string; content: unknown }>): { parts: Par
   };
 }
 
+const THINK_MS = 1500;
+
 export function mockModel() {
   const usage = {
     inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
@@ -56,6 +58,8 @@ export function mockModel() {
     modelId: "scripted-claude",
     doStream: async ({ prompt }) => {
       const { parts, reason } = decide(prompt as never);
+      // Pretend to think for a moment, so the demo page can show the helper working.
+      await new Promise((r) => setTimeout(r, THINK_MS));
       const all = [
         { type: "stream-start", warnings: [] },
         ...parts,

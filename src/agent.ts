@@ -198,9 +198,12 @@ export class Assistant extends Think<Env> {
   // ---- Status for the demo ----------------------------------------------------
   async snapshot() {
     this.ensureOutbox();
+    const subs = await this.listSubmissions();
+    // activeTurn covers live chat turns; queued inbox runs show up as a "running" submission.
+    const running = subs.find((s) => s.status === "running");
     return {
       model: this.env.ANTHROPIC_API_KEY && this.env.MODEL_MODE !== "mock" ? "claude-haiku-5-5" : "scripted (no API key)",
-      submissions: (await this.listSubmissions()).map((s) => ({
+      submissions: subs.map((s) => ({
         id: s.submissionId, key: s.idempotencyKey, status: s.status, requestId: s.requestId, createdAt: s.createdAt,
         source: s.metadata?.source, text: s.metadata?.text, causedBy: s.metadata?.causedBy
       })),
@@ -210,8 +213,8 @@ export class Assistant extends Think<Env> {
       })),
       outbox: this.ctx.storage.sql.exec("SELECT key, recipient, body, status, request_id AS requestId FROM app_outbox ORDER BY created_at").toArray(),
       // Is a run happening right now, or is the agent asleep (costing nothing)?
-      busy: Boolean(this.activeTurn),
-      workingOn: this.activeTurn?.requestId ?? null,
+      busy: Boolean(this.activeTurn || running),
+      workingOn: this.activeTurn?.requestId ?? running?.requestId ?? null,
       // Memory: the last few things in the conversation it keeps.
       notebook: this.messages.slice(-8).map((m) => ({
         role: m.role,

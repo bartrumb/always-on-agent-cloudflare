@@ -1,5 +1,22 @@
 # Always-on agent on Cloudflare
 
+[![Live demo](https://img.shields.io/badge/live_demo-try_it-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://always-on-agent.shopdawg.workers.dev)
+[![Walkthrough video](https://img.shields.io/badge/walkthrough-2_min_video-404041?style=for-the-badge&logo=youtube&logoColor=white)](https://always-on-agent.shopdawg.workers.dev/walkthrough)
+[![LinkedIn post](https://img.shields.io/badge/LinkedIn-read_the_post-0A66C2?style=for-the-badge)](https://www.linkedin.com/feed/update/urn:li:activity:7528552400182423553/)
+[![Anthropic article](https://img.shields.io/badge/based_on-Building_always--on_agents-D97757?style=for-the-badge&logo=anthropic&logoColor=white)](https://claude.com/resources/articles/building-always-on-agents)
+
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflareworkers&logoColor=white)](https://developers.cloudflare.com/workers/)
+[![Durable Objects](https://img.shields.io/badge/Durable_Objects-SQLite-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/durable-objects/)
+[![Think](https://img.shields.io/badge/agent_harness-Think-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/agents/harnesses/think/)
+[![Workflows](https://img.shields.io/badge/Cloudflare-Workflows-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/workflows/)
+[![Claude Haiku 5.5](https://img.shields.io/badge/model-Claude_Haiku_5.5-D97757?logo=claude&logoColor=white)](https://docs.claude.com/en/docs/about-claude/models)
+[![Workers traces](https://img.shields.io/badge/tracing-100%25_sampled-2C7CB0?logo=opentelemetry&logoColor=white)](https://developers.cloudflare.com/workers/observability/traces/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+[![Runs without a key](https://img.shields.io/badge/no_API_key-scripted_model_fallback-5C6670)](.dev.vars.example)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/bartrumb/always-on-agent-cloudflare)
+
 A small, runnable reference for Anthropic's article
 [Building always-on agents](https://claude.com/resources/articles/building-always-on-agents),
 built on Cloudflare Workers, Durable Objects, Workflows and the
@@ -12,7 +29,9 @@ pieces Cloudflare already ships, and adds only what is missing.
 
 **[Try the live demo](https://always-on-agent.shopdawg.workers.dev)** or
 **[watch the 2-minute walkthrough](https://always-on-agent.shopdawg.workers.dev/walkthrough)**
-(narrated, with captions).
+(narrated, with captions). It was shared, with the story behind it,
+[on LinkedIn](https://www.linkedin.com/feed/update/urn:li:activity:7528552400182423553/);
+feedback there or in [issues](https://github.com/bartrumb/always-on-agent-cloudflare/issues) is welcome.
 
 ```bash
 npm install

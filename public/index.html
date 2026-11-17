@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Always-on Agent</title>
 <meta name="description" content="A helper that keeps working after you close the tab: Anthropic's always-on agent pattern, running live on Cloudflare.">
+<!-- Link previews (LinkedIn, Slack, X). LinkedIn needs a PNG or JPG, about 1200x630. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Always-on agent on Cloudflare: live demo and code">
+<meta property="og:description" content="Anthropic's always-on agent pattern, built on Workers, Durable Objects, Workflows and Think. Try it: it waits for your signature, sets alarms, and replies when you're not looking.">
+<meta property="og:url" content="https://always-on-agent.shopdawg.workers.dev/">
+<meta property="og:image" content="https://always-on-agent.shopdawg.workers.dev/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Architecture of an always-on agent on Cloudflare: inbox, run, memory, approval, alarm and outbox inside one Durable Object.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&family=Big+Shoulders+Stencil:wght@800&display=swap" rel="stylesheet">
@@ -525,8 +535,13 @@ fetch("/config").then((r) => r.json()).then((cfg) => {
 }).catch(() => {});
 const track = (event, props) => { try { ph && ph.capture(event, props); } catch {} };
 
+// Server time, so countdowns and the chat's order hold even when this device's clock is off.
+// The Date header has 1 s resolution, which is plenty here.
+let skew = 0;
+const serverNow = () => Date.now() + skew;
 async function api(method, path, body) {
   const res = await fetch(path, { method, headers: body ? { "content-type": "application/json" } : {}, body: body && JSON.stringify(body) });
+  const d = Date.parse(res.headers.get("date") || ""); if (!Number.isNaN(d)) skew = d + 500 - Date.now();
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
@@ -581,7 +596,7 @@ const working = (c) => c.L?.status === "running" || (snap?.workingOn && snap.wor
 const busyNote = `<span class="step-detail"><span class="working-dot" aria-hidden="true"></span>The helper is working on it now.</span>`;
 const quote = (s) => `“${esc(untag(s))}”`;
 const countdown = (a) => {
-  const at = a.at < 1e12 ? a.at * 1000 : a.at; const secs = Math.max(0, Math.round((at - Date.now()) / 1000));
+  const at = a.at < 1e12 ? a.at * 1000 : a.at; const secs = Math.max(0, Math.round((at - serverNow()) / 1000));
   return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
 };
 
@@ -699,7 +714,7 @@ async function runTest(id) {
       await new Promise((ok) => setTimeout(ok, 1200));
       const again = await api("POST", `/events/${sid}`, event);
       runs[id].dupIgnored = again.accepted === false && again.submissionId === r.submissionId;
-      if (runs[id].dupIgnored) { dupLog.push({ at: Date.now(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog); dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]); say("The same letter arrived again. Stamped <b>duplicate</b> and ignored."); }
+      if (runs[id].dupIgnored) { dupLog.push({ at: serverNow(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog); dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]); say("The same letter arrived again. Stamped <b>duplicate</b> and ignored."); }
     }
     save("runs", runs);
     track("test_run", { test: id });
@@ -728,7 +743,7 @@ async function send(event) {
       say(`A letter from ${esc(event.source)} landed in the inbox.`);
     } else {
       dupKeys.add(`${event.source}:${event.id}`); save("dups", [...dupKeys]);
-      dupLog.push({ at: Date.now(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog);
+      dupLog.push({ at: serverNow(), submissionId: r.submissionId, source: event.source }); save("dupLog", dupLog);
       say("The same letter arrived again. Stamped <b>duplicate</b> and ignored.");
     }
     refresh();
@@ -768,7 +783,7 @@ function chatItems(s, lt) {
   for (const p of s.pendingApprovals) {
     const L = lt.byReq.get(p.requestId); const i = p.input || {};
     const what = p.action === "issue_refund" ? `a refund of $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
-    items.push({ t: (L?.createdAt ?? Date.now()) + 1, key: "sign:" + p.executionId, unread: true, html:
+    items.push({ t: (L?.createdAt ?? serverNow()) + 1, key: "sign:" + p.executionId, unread: true, html:
       `<div class="msg helper ask">${L ? tag(L.n, "About letter " + L.n) : ""}
         <p>I need your signature before I can issue ${what}. I'm going to sleep until you decide.</p>
         <span class="row"><button class="sign" onclick="decide('${esc(p.executionId)}', true, '${esc(L?.id ?? "")}')">Sign it</button>
@@ -776,12 +791,12 @@ function chatItems(s, lt) {
   }
   for (const a of s.alarms) {
     const L = lt.byReq.get(a.from);
-    items.push({ t: (L?.createdAt ?? Date.now()) + 2, key: "alarm:" + a.id, html:
+    items.push({ t: (L?.createdAt ?? serverNow()) + 2, key: "alarm:" + a.id, html:
       `<div class="note">Alarm set${L ? ` for letter ${L.n}` : ""}. It rings in <b>${countdown(a)}</b>.</div>` });
   }
   for (const m of s.outbox) {
     const L = lt.byReq.get(m.requestId) ?? lt.list.find((x) => x.n === refundOf[m.key]);
-    items.push({ t: m.createdAt ?? Date.now(), key: "out:" + m.key, unread: m.status === "sent", html:
+    items.push({ t: m.createdAt ?? serverNow(), key: "out:" + m.key, unread: m.status === "sent", html:
       `<div class="msg helper">${L ? tag(L.n, "Reply to letter " + L.n) : ""}<p>${esc(untag(m.body))}</p>
         <span class="meta-line">${m.status === "sent" ? "sent through the outbox" : "queued in the outbox"}</span></div>` });
   }
@@ -859,7 +874,7 @@ async function decide(id, approve, subId) {
     await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
     if (subId) { if (approve) { signed.add(subId); save("signed", [...signed]); } else { declined.add(subId); save("declined", [...declined]); } }
     // Keep the decision in the chat history once the request disappears.
-    signLog.push({ at: Date.now(), submissionId: subId, approve }); save("signLog", signLog);
+    signLog.push({ at: serverNow(), submissionId: subId, approve }); save("signLog", signLog);
     say(approve ? "You signed. The helper woke up to finish the job." : "You said no. The helper woke up and dropped the job.");
   } catch (e) { say(esc(e.message)); }
   refresh();
@@ -958,7 +973,7 @@ function render(s) {
 // Alarm countdowns tick every second between status polls.
 function paintClocks() {
   if (!snap) return;
-  const lt = letters(snap), now = Date.now();
+  const lt = letters(snap), now = serverNow();
   put("alarms", snap.alarms?.length ? snap.alarms.map((a) => {
     const L = lt.byReq.get(a.from);
     const at = a.at ? (a.at < 1e12 ? a.at * 1000 : a.at) : now;

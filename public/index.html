@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Always-on Agent</title>
+<meta name="description" content="A helper that keeps working after you close the tab: Anthropic's always-on agent pattern, running live on Cloudflare.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:wght@400;600;800&family=Big+Shoulders+Stencil:wght@800&display=swap" rel="stylesheet">
+<style>
+  /* Cloudflare palette: orange #F38020, tangerine #FAAE40, charcoal #404041, greys. */
+  :root {
+    --desk: #f2f2f2; --desk-deep: #dedede; --paper: #ffffff; --ink: #404041; --soft: #6d6d6f;
+    --rule: #e2e2e2; --folder: #faae40; --folder-deep: #e8962a; --red: #c25400; --green: #2e7d4f;
+    --orange: #f38020; --on-orange: #1d1d1f; --focus: #f38020; --lamp: #f38020;
+    --body: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+    --stamp: "Big Shoulders Stencil", Impact, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --desk: #1b1b1c; --desk-deep: #111112; --paper: #262628; --ink: #f2f2f2; --soft: #a8a8ab;
+      --rule: #3a3a3d; --folder: #faae40; --folder-deep: #e8962a; --red: #ff9a4d; --green: #6fd39a;
+      --orange: #f6821f; --on-orange: #1d1d1f; --focus: #faae40; --lamp: #f6821f;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--desk); color: var(--ink); font: 17px/1.55 var(--body); }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 40px 16px 64px; }
+
+  /* Hero */
+  .hero { display: grid; gap: 32px; grid-template-columns: 1.1fr 1fr; align-items: start; }
+  h1 { font-size: clamp(34px, 5vw, 56px); line-height: 1.04; letter-spacing: -0.02em; margin: 0 0 18px; font-weight: 800; max-width: 14ch; }
+  .lede { font-size: 19px; max-width: 34em; margin: 0 0 14px; }
+  .small { color: var(--soft); font-size: 15px; margin: 0; max-width: 40em; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-top: 18px; font-size: 14px; color: var(--soft); }
+  .meta b { color: var(--ink); font-weight: 600; }
+
+  /* Mail slot (compose) */
+  .slot { background: var(--paper); border-radius: 6px; padding: 20px; box-shadow: 0 1px 0 var(--rule), 0 10px 0 -4px var(--desk-deep); position: relative; }
+  .slot h2 { margin: 0 0 4px; font-size: 20px; }
+  .slot p { margin: 0 0 12px; color: var(--soft); font-size: 15px; }
+  label.lbl { display: block; font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
+  textarea, select { width: 100%; font: inherit; font-size: 16px; color: var(--ink); background: var(--desk); border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; }
+  textarea { min-height: 84px; resize: vertical; }
+  .fills { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  .row select { width: auto; }
+  button { font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); background: transparent; border: 1.5px solid var(--ink); border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+  button.go { background: var(--orange); border-color: var(--orange); color: var(--on-orange); }
+  button.chip { font-weight: 400; font-size: 14px; border: 1px dashed var(--soft); padding: 4px 10px; color: var(--soft); }
+  button.chip:hover { color: var(--ink); border-color: var(--ink); }
+  button.sign { border-color: var(--green); color: var(--green); }
+  button.no { border-color: var(--red); color: var(--red); }
+  button:disabled { opacity: .45; cursor: default; }
+  .ack { margin-top: 12px; font-size: 15px; min-height: 1.5em; }
+
+  /* The desk */
+  .desk-head { margin: 56px 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+  .desk-head h2 { margin: 0; font-size: 28px; letter-spacing: -0.01em; }
+  .desk-head p { margin: 0; color: var(--soft); }
+  .desk { display: grid; gap: 22px; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; }
+  .obj { position: relative; min-width: 0; }
+  .obj h3 { margin: 0; font-size: 20px; }
+  .eli5 { margin: 4px 0 12px; font-size: 16px; }
+  details { margin-top: 12px; font-size: 14px; color: var(--soft); }
+  summary { cursor: pointer; font-weight: 600; color: var(--ink); width: fit-content; }
+  details p { margin: 6px 0 0; }
+  code { font-family: inherit; font-weight: 600; color: var(--ink); background: var(--desk); padding: 0 4px; border-radius: 3px; }
+
+  /* Trays: stacked sheets */
+  .tray { background: var(--paper); border-radius: 4px; padding: 18px; box-shadow: 4px 4px 0 var(--desk-deep), 8px 8px 0 var(--rule); }
+  .sheets { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .sheet { position: relative; border: 1px solid var(--rule); border-radius: 3px; padding: 8px 96px 8px 10px; font-size: 15px; overflow: hidden; overflow-wrap: anywhere; }
+  .sheet small { display: block; color: var(--soft); font-size: 13px; }
+  .empty { color: var(--soft); font-size: 15px; border: 1px dashed var(--rule); border-radius: 3px; padding: 10px; }
+
+  /* The helper */
+  .helper { background: var(--paper); border-radius: 4px; padding: 18px; border-top: 6px solid var(--orange); }
+  .lamp { display: flex; align-items: center; gap: 12px; margin: 6px 0 10px; font-weight: 800; font-size: 22px; }
+  .bulb { width: 22px; height: 22px; border-radius: 50%; background: var(--rule); box-shadow: inset 0 0 0 2px var(--soft); flex: none; }
+  .helper.on .bulb { background: var(--lamp); box-shadow: 0 0 0 6px color-mix(in srgb, var(--lamp) 30%, transparent); }
+  .model { font-size: 14px; color: var(--soft); }
+
+  /* Folder with tab */
+  .folder { background: var(--folder); color: #1d1d1f; border-radius: 0 6px 6px 6px; padding: 18px; margin-top: 18px; }
+  .folder::before { content: ""; position: absolute; top: 0; left: 0; width: 46%; height: 20px; background: var(--folder); border-radius: 6px 6px 0 0; }
+  .folder .eli5, .folder h3 { color: #1d1d1f; }
+  .folder details, .folder details summary { color: #2b2b2c; }
+  .folder code { background: color-mix(in srgb, #fff 45%, var(--folder)); color: #1d1d1f; }
+  .folder .sheet { background: #fffdf6; border-color: var(--folder-deep); color: #1d1d1f; }
+  .folder .sheet small { color: #5a4a2a; }
+  .folder .empty { border-color: var(--folder-deep); color: #4a3d22; }
+  .folder button.sign { color: #1f5e39; border-color: #1f5e39; background: #fffdf6; }
+  .folder button.no { color: #9a3f00; border-color: #9a3f00; background: #fffdf6; }
+
+  /* Notebook with ruled lines */
+  .notebook { background: var(--paper); border-radius: 4px; padding: 18px 18px 18px 30px; border-left: 3px double var(--orange); }
+  #notebook { background-image: repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px); }
+  .notebook .line { font-size: 15px; line-height: 28px; margin: 0; overflow-wrap: anywhere; }
+  .notebook .who { font-weight: 800; }
+  .notebook .tool { color: var(--soft); }
+
+  /* Alarm clocks */
+  .clocks { background: var(--paper); border-radius: 4px; padding: 18px; border: 2px solid var(--ink); }
+  .clock { display: flex; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--rule); }
+  .clock:last-child { border-bottom: 0; }
+  .digits { font-family: var(--stamp); font-size: 34px; line-height: 1; min-width: 3.2ch; }
+  .clock span { font-size: 14px; color: var(--soft); overflow-wrap: anywhere; }
+
+  /* Rubber stamps: the one bit of motion */
+  .stamp { position: absolute; right: 8px; top: 50%; translate: 0 -50%; rotate: -8deg; font-family: var(--stamp); font-size: 20px; letter-spacing: .04em;
+    padding: 1px 8px; border: 3px solid currentColor; border-radius: 4px; color: var(--red); opacity: .85; pointer-events: none; background: color-mix(in srgb, var(--paper) 70%, transparent); }
+  .stamp.g { color: var(--green); }
+  .folder .stamp { background: #fffdf6; color: #9a3f00; }
+  .thunk { animation: thunk .42s cubic-bezier(.2,.9,.3,1.3) both; }
+  @keyframes thunk { from { scale: 2.4; opacity: 0; rotate: -18deg; } 70% { opacity: .95; } to { scale: 1; opacity: .85; rotate: -8deg; } }
+  @media (prefers-reduced-motion: reduce) { .thunk { animation: none; } }
+
+  /* What just happened */
+  .log { margin-top: 40px; display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+  .log h2 { margin: 0 0 6px; font-size: 24px; }
+  .log p { margin: 0; color: var(--soft); }
+  .story { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--orange); }
+  .story li { padding: 6px 0 6px 16px; position: relative; font-size: 16px; }
+  .story li::before { content: ""; position: absolute; left: -6px; top: 15px; width: 10px; height: 10px; border-radius: 50%; background: var(--orange); }
+  .story time { color: var(--soft); font-size: 13px; margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+  /* Long chore */
+  .chore { margin-top: 56px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+  .chore h2 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.01em; }
+  .chore > div > p { margin: 0 0 12px; max-width: 36em; }
+  .card { background: var(--paper); border-radius: 4px; padding: 20px; border: 1px solid var(--rule); }
+  .card h3 { margin: 0 0 10px; font-size: 18px; }
+  .checks { list-style: none; margin: 0; padding: 0; counter-reset: s; }
+  .checks li { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--rule); position: relative; }
+  .box { width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 3px; flex: none; display: grid; place-items: center; font-weight: 800; color: var(--green); }
+  .checks li.done .box::after { content: "✓"; }
+  .checks li.wait .box { border-style: dashed; }
+  .checks li .note { color: var(--soft); font-size: 14px; margin-left: auto; text-align: right; }
+  .lesson { margin-top: 18px; display: grid; gap: 10px; }
+  .run { border: 1px solid var(--rule); border-radius: 4px; padding: 10px 12px; background: var(--paper); font-size: 15px; }
+  .run b { display: block; }
+  .run.good { border-left: 5px solid var(--green); } .run.bad { border-left: 5px solid var(--orange); }
+  .run s { color: var(--red); }
+
+  /* Grown-up map */
+  .map { margin-top: 56px; }
+  .map h2 { margin: 0 0 4px; font-size: 24px; }
+  .map > p { margin: 0 0 14px; color: var(--soft); }
+  table { width: 100%; border-collapse: collapse; background: var(--paper); border-radius: 4px; overflow: hidden; font-size: 15px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--rule); }
+  th { font-weight: 800; }
+  .sources { margin-top: 56px; }
+  .sources h2 { margin: 0 0 4px; font-size: 24px; }
+  .sources > p { margin: 0 0 14px; color: var(--soft); }
+  .sources .cols { display: grid; gap: 24px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sources h3 { margin: 0 0 6px; font-size: 16px; }
+  .sources ul { margin: 0; padding-left: 18px; font-size: 15px; }
+  .sources li { margin-bottom: 6px; }
+  .sources a { text-decoration-color: var(--orange); text-decoration-thickness: 2px; }
+  footer { margin-top: 40px; color: var(--soft); font-size: 14px; max-width: 70ch; }
+  footer p { margin: 0 0 8px; }
+
+  @media (max-width: 900px) {
+    .hero, .log, .chore, .sources .cols { grid-template-columns: 1fr; }
+    .desk { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 620px) {
+    .wrap { padding-top: 28px; }
+    .desk { grid-template-columns: 1fr; }
+    .tray { box-shadow: 3px 3px 0 var(--desk-deep), 6px 6px 0 var(--rule); }
+    .table-wrap { overflow-x: auto; }
+    table { min-width: 560px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section class="hero">
+    <div>
+      <h1>A helper that keeps working after you close the tab</h1>
+      <p class="lede">Most chatbots only think while you're talking to them. This one is woken up by things
+        happening: an email arrives, an alarm rings, a person says yes. Between jobs it sleeps and costs nothing.</p>
+      <p class="small">It's a working copy of Anthropic's
+        <a href="https://claude.com/resources/articles/building-always-on-agents" target="_blank" rel="noopener">Building always-on agents</a>,
+        running on Cloudflare. Drop something in its inbox and watch its desk below.
+        <a href="https://github.com/bartrumb/always-on-agent-cloudflare" target="_blank" rel="noopener">Read the code on GitHub</a>.</p>
+      <div class="meta">
+        <span>Your helper: <b id="sid"></b></span>
+        <span>Thinking with: <b id="model">…</b></span>
+        <button class="chip" id="reset">Get a fresh helper</button>
+      </div>
+    </div>
+
+    <form class="slot" id="slotForm">
+      <h2>Drop something in the inbox</h2>
+      <p>This is what a webhook does: it hands over a letter and leaves. The reply comes later.</p>
+      <label class="lbl" for="text">The letter</label>
+      <textarea id="text" maxlength="500">Please refund order #A100, it arrived broken</textarea>
+      <div class="fills" aria-label="Example letters">
+        <button type="button" class="chip" data-fill="Please refund order #A100, it arrived broken">Ask for a refund</button>
+        <button type="button" class="chip" data-fill="Remind me to check the shipment in a minute">Ask for a reminder</button>
+        <button type="button" class="chip" data-fill="From now on, keep every reply to one short sentence">Give a standing rule</button>
+      </div>
+      <div class="row">
+        <label class="lbl" for="source" style="margin:0">From</label>
+        <select id="source"><option value="email">Email</option><option value="chat">Chat</option><option value="webhook">Webhook</option></select>
+        <button type="submit" class="go" id="send">Drop it in</button>
+        <button type="button" id="dup" disabled>Deliver the same letter again</button>
+      </div>
+      <div class="ack" id="ack" aria-live="polite"></div>
+    </form>
+  </section>
+
+  <div class="desk-head">
+    <h2>The helper's desk</h2>
+    <p>Everything here is saved, so it survives restarts, deploys and days of waiting.</p>
+  </div>
+
+  <section class="desk">
+    <div class="obj tray">
+      <h3>Inbox tray</h3>
+      <p class="eli5">Every letter gets a ticket and waits its turn. If the same letter shows up twice, it gets stamped and ignored, so nothing is done twice.</p>
+      <ul class="sheets" id="inbox"></ul>
+      <details><summary>How it's built</summary>
+        <p>Think's <code>submitMessages()</code> with an idempotency key made from the source and the event id. Tickets live in the Durable Object's SQLite and run one at a time, in order.</p>
+      </details>
+    </div>
+
+    <div class="obj helper" id="helper">
+      <h3>The helper</h3>
+      <div class="lamp"><span class="bulb" aria-hidden="true"></span><span id="lampText">Asleep</span></div>
+      <p class="eli5">It picks up one ticket, reads its notebook, decides what to do, uses its tools, and goes back to sleep. Nobody has to keep a window open.</p>
+      <p class="model" id="modelNote"></p>
+      <details><summary>How it's built</summary>
+        <p>One Durable Object per visitor, running Cloudflare's Think agent harness. Claude Haiku 5.5 does the thinking, set to low effort with at most 4 tool rounds per job to keep it cheap.</p>
+      </details>
+    </div>
+
+    <div class="obj tray">
+      <h3>Outbox tray</h3>
+      <p class="eli5">The helper never shouts out the window. Anything it wants to say goes in this tray, and a mail carrier delivers each piece exactly once.</p>
+      <ul class="sheets" id="outbox"></ul>
+      <details><summary>How it's built</summary>
+        <p>An <code>app_outbox</code> table keyed by idempotency key, so a redone job can't send twice. A dispatcher on the Durable Object alarm delivers each row (log or webhook) and retries failures.</p>
+      </details>
+    </div>
+
+    <div class="obj folder">
+      <h3>Needs your signature</h3>
+      <p class="eli5">Some jobs are too risky to do alone, like giving money back. The helper fills in the form, puts it here and goes to sleep. When you sign, it wakes up and finishes.</p>
+      <ul class="sheets" id="approvals"></ul>
+      <details><summary>How it's built</summary>
+        <p>A Think action with <code>kind: "durable-pause"</code>. The run ends; the paused action is stored. <code>approveExecution()</code> runs it and continues the conversation, hours or days later.</p>
+      </details>
+    </div>
+
+    <div class="obj notebook">
+      <h3>Notebook</h3>
+      <p class="eli5">The helper forgets everything when it sleeps, so it writes things down and reads the notebook every time it wakes.</p>
+      <div id="notebook"></div>
+      <details><summary>How it's built</summary>
+        <p>Think Sessions store the conversation in SQLite, plus a <code>memory</code> block the model can rewrite for standing rules.</p>
+      </details>
+    </div>
+
+    <div class="obj clocks">
+      <h3>Alarm clocks</h3>
+      <p class="eli5">Ask it to check back later and it sets an alarm. When the alarm rings, it's just another letter in the inbox.</p>
+      <div id="alarms"></div>
+      <details><summary>How it's built</summary>
+        <p>The agent's <code>schedule()</code>, which sits on the Durable Object alarm. When it fires it calls <code>followUp()</code>, which drops a new event in the inbox.</p>
+      </details>
+    </div>
+  </section>
+
+  <section class="log">
+    <div>
+      <h2>What just happened</h2>
+      <p>The same story in words, as the desk changes.</p>
+    </div>
+    <ol class="story" id="story" aria-live="polite"></ol>
+  </section>
+
+  <section class="chore">
+    <div>
+      <h2>A long chore with a pause in the middle</h2>
+      <p>Some jobs have several steps and a wait where a person has to say OK, maybe days later. The helper ticks off a checklist as it goes, and finds each tick by the step's name.</p>
+      <p>That's why the rule for updating a helper is: <b>add new steps, never rename old ones.</b> Change the instructions while it's paused and it skips every step it already ticked. Rename a step and it can't find the tick, so it does that step again.</p>
+      <div class="lesson">
+        <div class="run good"><b>Update that adds a step</b>
+          Gather changes and Write notes were already ticked, so they're skipped. The new step, Tell the team, runs, then Publish. Nothing is done twice.</div>
+        <div class="run bad"><b>Update that renames a step</b>
+          Write notes was renamed to Write release notes. The helper can't find a tick for the new name, so it writes the notes again and pays for a second AI call.</div>
+      </div>
+      <details><summary>How it's built</summary>
+        <p>A Cloudflare Workflow (<code>ThinkWorkflow</code>). Step names are cache keys: <code>step.do("draft-notes")</code> returns its saved result on resume. The pause is <code>waitForApproval()</code>; the instance sleeps without using compute. Both runs above are real results from the repo's demo script.</p>
+      </details>
+    </div>
+    <div class="card">
+      <h3>Try it: release checklist</h3>
+      <ul class="checks" id="checks">
+        <li data-step="collect-changes"><span class="box"></span>Gather the changes</li>
+        <li data-step="draft-notes"><span class="box"></span>Write the release notes</li>
+        <li data-step="wait"><span class="box"></span>Wait for a person to say OK</li>
+        <li data-step="publish"><span class="box"></span>Publish</li>
+      </ul>
+      <div class="row">
+        <button class="go" id="startRel">Start the chore</button>
+        <button class="sign" id="approveRel" disabled>Say OK</button>
+      </div>
+      <div class="ack" id="relStatus" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="map">
+    <h2>The grown-up version</h2>
+    <p>Each part of the article, and the Cloudflare piece that does it.</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>Article</th><th>On this desk</th><th>Cloudflare</th></tr></thead>
+      <tbody>
+        <tr><td>Event inbox</td><td>Inbox tray</td><td>Worker acks fast; Think durable submissions, deduped by event id, one run at a time</td></tr>
+        <tr><td>Timers</td><td>Alarm clocks</td><td>Agent schedules on the Durable Object alarm</td></tr>
+        <tr><td>Memory and task progress</td><td>Notebook, checklist</td><td>Think Sessions and context blocks in SQLite; Workflow step results</td></tr>
+        <tr><td>Permissions</td><td>Needs your signature</td><td>Durable-pause actions resumed by <code>approveExecution()</code></td></tr>
+        <tr><td>Outbox</td><td>Outbox tray</td><td>An outbox table plus an alarm-driven dispatcher</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section class="sources">
+    <h2>Sources</h2>
+    <p>The idea, and every project this demo is built on.</p>
+    <div class="cols">
+      <div>
+        <h3>This demo</h3>
+        <ul>
+          <li><a href="https://github.com/bartrumb/always-on-agent-cloudflare" target="_blank" rel="noopener">always-on-agent-cloudflare</a>: the code for this page, the agent and the demo script</li>
+          <li><a href="https://claude.com/resources/articles/building-always-on-agents" target="_blank" rel="noopener">Building always-on agents</a>: the Anthropic article this demo follows</li>
+          <li><a href="https://platform.claude.com/docs/en/about-claude/models/overview" target="_blank" rel="noopener">Claude models</a>: Claude Haiku 5.5 does the thinking</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Cloudflare</h3>
+        <ul>
+          <li><a href="https://github.com/cloudflare/agents" target="_blank" rel="noopener">cloudflare/agents</a>: the Agents SDK and the <a href="https://developers.cloudflare.com/agents/harnesses/think/" target="_blank" rel="noopener">Think</a> harness</li>
+          <li><a href="https://github.com/cloudflare/computer" target="_blank" rel="noopener">cloudflare/computer</a>: the workspace Think uses</li>
+          <li><a href="https://github.com/cloudflare/workers-sdk" target="_blank" rel="noopener">cloudflare/workers-sdk</a>: Wrangler, for local dev and deploys</li>
+          <li><a href="https://developers.cloudflare.com/workers/" target="_blank" rel="noopener">Workers</a>, <a href="https://developers.cloudflare.com/durable-objects/" target="_blank" rel="noopener">Durable Objects</a>, <a href="https://developers.cloudflare.com/workflows/" target="_blank" rel="noopener">Workflows</a>, <a href="https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/" target="_blank" rel="noopener">Rate Limiting</a> and <a href="https://developers.cloudflare.com/workers/observability/traces/" target="_blank" rel="noopener">Traces</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Other open source</h3>
+        <ul>
+          <li><a href="https://github.com/vercel/ai" target="_blank" rel="noopener">vercel/ai</a>: the AI SDK and its Anthropic provider</li>
+          <li><a href="https://github.com/colinhacks/zod" target="_blank" rel="noopener">colinhacks/zod</a>: tool input schemas</li>
+          <li><a href="https://github.com/vercel-labs/just-bash" target="_blank" rel="noopener">vercel-labs/just-bash</a>: required by the Agents SDK bundle</li>
+          <li><a href="https://github.com/PostHog/posthog-js" target="_blank" rel="noopener">PostHog/posthog-js</a> and <a href="https://posthog.com/docs/llm-analytics" target="_blank" rel="noopener">PostHog LLM analytics</a>: usage, replays and errors</li>
+          <li>Type: <a href="https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next" target="_blank" rel="noopener">Atkinson Hyperlegible Next</a> and <a href="https://fonts.google.com/specimen/Big+Shoulders+Stencil" target="_blank" rel="noopener">Big Shoulders Stencil</a></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>Built on Cloudflare Workers, Durable Objects, Workflows and the Think agent harness, with Claude Haiku 5.5. It's a demo: refunds aren't real and each visitor is limited to 10 letters a minute.</p>
+    <p>Usage, session replays and errors are recorded with PostHog to see how the demo is used, so don't type anything private.</p>
+  </footer>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const untag = (s) => String(s ?? "").replace(/\[(email|chat|webhook|timer)\]\s*/g, "");
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const newId = () => "s-" + crypto.randomUUID().slice(0, 12);
+let sid = store.get("sid") || newId(); store.set("sid", sid);
+let lastEvent = null, relId = store.get("rel:" + sid);
+$("sid").textContent = sid;
+
+// PostHog: traffic, session replay and front-end errors. Loads only when the Worker has a
+// project token. The helper id is the distinct id, so replays line up with LLM traces.
+let ph = null;
+fetch("/config").then((r) => r.json()).then((cfg) => {
+  if (!cfg.posthogKey) return;
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/posthog-js@1.444.0/dist/array.full.js";
+  s.crossOrigin = "anonymous";
+  s.onload = () => {
+    ph = window.posthog;
+    ph.init(cfg.posthogKey, { api_host: cfg.posthogHost, bootstrap: { distinctID: sid }, capture_pageview: true,
+      capture_pageleave: true, capture_exceptions: true, session_recording: { maskAllInputs: false } });
+  };
+  document.head.appendChild(s);
+}).catch(() => {});
+const track = (event, props) => { try { ph && ph.capture(event, props); } catch {} };
+
+async function api(method, path, body) {
+  const res = await fetch(path, { method, headers: body ? { "content-type": "application/json" } : {}, body: body && JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// ---- The story feed ---------------------------------------------------------
+const said = [];
+function say(text) {
+  const t = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  said.unshift(`<li><time>${t}</time>${text}</li>`);
+  $("story").innerHTML = said.slice(0, 12).join("");
+}
+function storyEmpty() { if (!said.length) $("story").innerHTML = `<li>Nothing yet. Drop a letter in the inbox to wake the helper.</li>`; }
+
+// ---- Stamps: thunk only the first time something appears -------------------
+const seen = new Set(store.get("seen:" + sid) ? JSON.parse(store.get("seen:" + sid)) : []);
+let firstPaint = true;
+function stamp(key, word, green) {
+  const fresh = !seen.has(key);
+  if (fresh) { seen.add(key); store.set("seen:" + sid, JSON.stringify([...seen].slice(-200))); }
+  return `<span class="stamp${green ? " g" : ""}${fresh && !firstPaint ? " thunk" : ""}">${word}</span>`;
+}
+
+// ---- Send ----------------------------------------------------------------------
+async function send(event) {
+  $("ack").textContent = "Dropping it in…";
+  try {
+    const r = await api("POST", `/events/${sid}`, event);
+    lastEvent = event; $("dup").disabled = false;
+    if (r.accepted) {
+      $("ack").textContent = "Got a ticket. The helper will pick it up in a moment.";
+      say(`A letter from ${esc(event.source)} landed in the inbox and got a ticket.`);
+    } else {
+      $("ack").textContent = "Same letter as before, so it was stamped Duplicate and ignored.";
+      say(`The same letter arrived again. Stamped <b>duplicate</b> and ignored; nothing will happen twice.`);
+      dupKeys.add(`${event.source}:${event.id}`); saveDups();
+    }
+    refresh();
+  } catch (e) {
+    $("ack").textContent = e.message;
+    track("ui_error", { where: "send", message: e.message });
+  }
+}
+const dupKeys = new Set(JSON.parse(store.get("dups:" + sid) || "[]"));
+const saveDups = () => store.set("dups:" + sid, JSON.stringify([...dupKeys]));
+$("slotForm").onsubmit = (e) => { e.preventDefault(); send({ source: $("source").value, id: crypto.randomUUID().slice(0, 8), text: $("text").value }); };
+$("dup").onclick = () => lastEvent && send(lastEvent);
+document.querySelectorAll("[data-fill]").forEach((b) => (b.onclick = () => { $("text").value = b.dataset.fill; $("text").focus(); }));
+$("reset").onclick = () => {
+  sid = newId(); store.set("sid", sid); relId = null; $("sid").textContent = sid; $("ack").textContent = "";
+  said.length = 0; seen.clear(); dupKeys.clear(); prev = null; firstPaint = true; storyEmpty();
+  if (ph) { ph.reset(); ph.identify(sid); }
+  refresh();
+};
+
+async function decide(id, approve) {
+  try {
+    await api("POST", `/approvals/${sid}/${id}`, { approve, reason: approve ? undefined : "Declined in demo" });
+    say(approve ? "You signed. The helper woke up to finish the job." : "You said no. The helper woke up and dropped the job.");
+  } catch (e) { say(esc(e.message)); }
+  refresh();
+}
+window.decide = decide;
+
+// ---- Render the desk -------------------------------------------------------------
+const friendly = { issue_refund: "Refund", send_message: "Send a message", schedule_follow_up: "Set an alarm" };
+const empty = (t) => `<li class="empty">${t}</li>`;
+// Redraw a panel only when its content changed, so focus and clicks aren't lost.
+const put = (id, html) => { const el = $(id); if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };
+let prev = null;
+
+function narrate(s) {
+  if (!prev) return;
+  const was = new Map(prev.submissions.map((x) => [x.id, x.status]));
+  for (const x of s.submissions) {
+    const before = was.get(x.id);
+    if (!before && x.key?.startsWith("timer:")) say("An alarm rang. It became a new letter in the inbox.");
+    if (before !== "running" && x.status === "running") say("The helper woke up and started on a ticket.");
+    if (before && before !== "completed" && x.status === "completed") say("Ticket done. The helper went back to sleep.");
+  }
+  const oldA = new Set(prev.pendingApprovals.map((p) => p.executionId));
+  for (const p of s.pendingApprovals) if (!oldA.has(p.executionId))
+    say(`The helper wants your signature for a <b>${esc(friendly[p.action] ?? p.action)}</b>, and went to sleep instead of waiting.`);
+  const oldO = new Set(prev.outbox.filter((m) => m.status === "sent").map((m) => m.key));
+  for (const m of s.outbox) if (m.status === "sent" && !oldO.has(m.key)) say(`The mail carrier delivered: “${esc(untag(m.body))}”`);
+  const oldC = new Set(prev.alarms.map((a) => a.id));
+  for (const a of s.alarms) if (!oldC.has(a.id)) say("The helper set an alarm to check back later.");
+}
+
+function ticketLabel(x) {
+  if (x.key?.startsWith("timer:")) return "Alarm rang";
+  const src = (x.key ?? "").split(":")[0];
+  return src ? `Letter from ${src}` : "Letter";
+}
+
+function render(s) {
+  narrate(s);
+  $("model").textContent = s.model === "claude-haiku-5-5" ? "Claude Haiku 5.5" : "a practice script (no AI key set)";
+  $("modelNote").textContent = s.model === "claude-haiku-5-5"
+    ? "Thinking with Claude Haiku 5.5, the smallest, cheapest Claude."
+    : "Right now it follows a practice script instead of calling Claude, so it's free.";
+  const helper = $("helper"); helper.classList.toggle("on", !!s.busy);
+  $("lampText").textContent = s.busy ? "Working" : "Asleep";
+
+  const statusWord = { pending: "Waiting", running: "Working", completed: "Done", error: "Failed", aborted: "Cancelled", skipped: "Skipped" };
+  put("inbox", s.submissions.length ? s.submissions.slice(0, 6).map((x) => {
+    const done = x.status === "completed";
+    const st = dupKeys.has(x.key) ? stamp("dup:" + x.key, "Duplicate") : done ? stamp("done:" + x.id, "Done", true) : "";
+    return `<li class="sheet">${esc(ticketLabel(x))}<small>${esc(statusWord[x.status] ?? x.status)}, ticket ${esc(x.id.slice(0, 6))}</small>${st}</li>`;
+  }).join("") : empty("Empty. Drop a letter in to wake the helper."));
+
+  put("approvals", s.pendingApprovals.length ? s.pendingApprovals.map((p) => {
+    const i = p.input || {};
+    const what = p.action === "issue_refund" ? `Refund $${esc(i.amountUsd)} for order ${esc(i.orderId)}` : esc(friendly[p.action] ?? p.action);
+    return `<li class="sheet">${what}<small>Risk: ${esc(p.risk ?? "unknown")}</small>${stamp("sign:" + p.executionId, "Sign here")}
+      <div class="row" style="margin-top:8px"><button class="sign" onclick="decide('${esc(p.executionId)}', true)">Sign it</button>
+      <button class="no" onclick="decide('${esc(p.executionId)}', false)">Say no</button></div></li>`;
+  }).join("") : empty("Nothing to sign. Ask for a refund to fill this folder."));
+
+  put("outbox", s.outbox.length ? s.outbox.slice(-5).reverse().map((m) =>
+    `<li class="sheet">${esc(untag(m.body))}<small>To: ${esc(m.recipient)}</small>${m.status === "sent" ? stamp("sent:" + m.key, "Sent", true) : stamp("q:" + m.key, "Queued")}</li>`
+  ).join("") : empty("Nothing sent yet. The helper only speaks through here."));
+
+  put("notebook", s.notebook?.length ? s.notebook.map((n) => {
+    const who = n.role === "user" ? "Letter" : "Helper";
+    const tools = n.tools?.length ? ` <span class="tool">(used: ${n.tools.map((t) => esc(friendly[t.name] ?? t.name)).join(", ")})</span>` : "";
+    const text = n.text ? esc(untag(n.text)) : "";
+    return `<p class="line"><span class="who">${who}:</span> ${text}${tools}</p>`;
+  }).join("") : `<p class="line" style="color:var(--soft)">Blank page. It fills up as the helper works.</p>`);
+
+  const now = Date.now();
+  put("alarms", s.alarms?.length ? s.alarms.map((a) => {
+    const at = a.at ? (a.at < 1e12 ? a.at * 1000 : a.at) : now;
+    const secs = Math.max(0, Math.round((at - now) / 1000));
+    const mm = Math.floor(secs / 60), ss = String(secs % 60).padStart(2, "0");
+    return `<div class="clock"><span class="digits">${mm}:${ss}</span><span>${esc(untag(a.note))}</span></div>`;
+  }).join("") : `<p class="empty" style="margin:0">No alarms set. Ask for a reminder to set one.</p>`);
+
+  prev = s; firstPaint = false;
+}
+
+// ---- Release chore -----------------------------------------------------------------
+async function refreshRelease() {
+  const rows = document.querySelectorAll("#checks li");
+  if (!relId) { rows.forEach((li) => (li.className = "")); $("approveRel").disabled = true; $("relStatus").textContent = "Not started."; return; }
+  try {
+    const r = await api("GET", `/releases/${sid}/${relId}`);
+    const steps = new Set(r.stepsThatRan.map((x) => x.step));
+    const complete = r.status?.status === "complete";
+    const waiting = steps.has("draft-notes") && !steps.has("publish") && !complete;
+    rows.forEach((li) => {
+      const k = li.dataset.step;
+      li.className = (k === "wait" ? (complete || steps.has("publish")) : steps.has(k)) ? "done" : (k === "wait" && waiting ? "wait" : "");
+    });
+    $("approveRel").disabled = !waiting;
+    $("relStatus").textContent = complete ? "Finished. Each step ran exactly once." : waiting ? "Paused, using no compute, until someone says OK." : "Working through the steps…";
+  } catch { $("relStatus").textContent = "Starting…"; }
+}
+$("startRel").onclick = async () => {
+  try {
+    relId = (await api("POST", `/releases/${sid}`)).workflowId; store.set("rel:" + sid, relId);
+    say("Started a long chore. It will stop and wait for your OK halfway.");
+    refreshRelease();
+  } catch (e) { $("relStatus").textContent = e.message; }
+};
+$("approveRel").onclick = async () => {
+  await api("POST", `/releases/${sid}/${relId}/approve`);
+  say("You said OK. The chore picked up where it paused, skipping the steps already done.");
+  refreshRelease();
+};
+
+async function refresh() {
+  try { render(await api("GET", `/status/${sid}`)); } catch {}
+  refreshRelease();
+}
+storyEmpty();
+refresh();
+setInterval(() => { if (!document.hidden) refresh(); }, 1500);
+</script>
+</body>
+</html>

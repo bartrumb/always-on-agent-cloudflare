@@ -1,0 +1,181 @@
+# Always-on agent on Cloudflare
+
+A small, runnable reference for Anthropic's article
+[Building always-on agents](https://claude.com/resources/articles/building-always-on-agents),
+built on Cloudflare Workers, Durable Objects, Workflows and the
+[Think](https://developers.cloudflare.com/agents/harnesses/think/) agent harness.
+
+The article describes the five parts an agent needs once it stops living in a chat
+window and starts reacting to events. It is written in prose and diagrams, with no
+code and no named platform. This repo shows each part as working code, using the
+pieces Cloudflare already ships, and adds only what is missing.
+
+```bash
+npm install
+npm run dev         # open http://localhost:8787 for the one-page UI
+npm run demo        # or: scripted end-to-end run with checks; no API key needed
+```
+
+## The five parts, mapped
+
+| Article | Cloudflare | Where |
+|---|---|---|
+| **Event inbox**: accept events fast, run them one at a time, never twice | Think `submitMessages()` with an `idempotencyKey` (source + event id). Durable, first-in first-out, one turn at a time per user. | `Assistant.ingest()` |
+| **Timers**: wake up later without anyone asking | Agent `schedule()`, backed by the Durable Object alarm. A timer firing is just another inbox event. | `schedule_follow_up`, `followUp()` |
+| **Memory and task progress** | Think Sessions (the transcript, in the Durable Object's SQLite) plus a `memory` context block the model can rewrite | `configureContext()` |
+| **Permissions**: risky actions wait for a human | A `kind: "durable-pause"` action. The run *ends*; nothing waits in memory. `approveExecution()` later runs the action and continues the conversation. | `issue_refund`, `Assistant.decide()` |
+| **Outbox**: side effects leave through one door, once | *Not in Think, so it lives here:* an `app_outbox` table keyed by idempotency key, delivered on the alarm with retries (log or webhook) | `enqueueOutbox()`, `dispatchOutbox()` |
+
+```mermaid
+flowchart LR
+  subgraph sources [Event sources]
+    W[Webhook / email / chat]
+    H[Human approval]
+  end
+  W -- POST /events/:user --> F[Worker<br/>fast ack]
+  H -- POST /approvals/:user/:id --> F
+  F -- RPC --> A
+
+  subgraph A [Assistant: one Durable Object per user]
+    direction TB
+    I[(Inbox<br/>Think submissions<br/>dedupe by event id)] --> R[Run<br/>Claude + tools]
+    R <--> M[(Memory<br/>Sessions + context block)]
+    R -- risky action --> P[(Paused action<br/>run ends)]
+    P -- approveExecution --> R
+    R -- schedule_follow_up --> T[(Timer<br/>DO alarm)]
+    T -- fires as new event --> I
+    R -- send_message --> O[(Outbox table)]
+  end
+  O -- alarm dispatcher, retries --> X[Log / webhook]
+  A -- runWorkflow --> WF[ReleaseWorkflow<br/>long multi-step job]
+```
+
+## What the demo shows
+
+`npm run demo` starts `wrangler dev`, sends HTTP requests to it, and checks the results:
+
+1. **Inbox.** An email webhook asks for a refund. The Worker returns 202 at once. The
+   same webhook delivered again comes back `accepted: false`, the same submission.
+2. **Deferred approval.** The run calls `issue_refund`, which needs a human. The run
+   ends. A pending approval is stored, and nothing has gone out yet.
+3. **Resume.** A person approves (`POST /approvals/...`). That answer resumes the saved
+   action. The refund message goes to the outbox and is delivered once.
+4. **Timer.** "Remind me to check the shipment" schedules an alarm. When it fires, it
+   comes back through the inbox like any other event and sends a follow-up.
+5. **Deploy safety.** See below.
+
+With no API key the model is a small scripted stand-in (`src/mock-model.ts`), so the
+demo is free, offline and gives the same result every time. Add a key and the same code
+runs on **Claude Haiku 5.5** (`claude-haiku-5-5`):
+
+```bash
+echo "ANTHROPIC_API_KEY=sk-ant-..." > .dev.vars      # local; git-ignored
+npx wrangler secret put ANTHROPIC_API_KEY           # deployed
+```
+
+Haiku is the cheapest current Claude model ($0.10 / $0.50 per million input / output
+tokens), which keeps a public demo cheap. For real work, change the model id in
+`getModel()`. Think is built on the AI SDK, so Claude is reached through
+`@ai-sdk/anthropic`.
+
+## Public demo and cost guards
+
+The Worker serves a one-page UI (`public/index.html`). Each browser gets its own agent
+(one Durable Object), with panels for the inbox, approvals waiting for you, the outbox,
+and a release Workflow you can approve. Because anyone can use a public page, every run
+is kept small:
+
+- **Rate limit:** 10 model-waking requests a minute per IP (Workers Rate Limiting
+  binding `EVENT_LIMIT`). Beyond that you get a 429.
+- **Input cap:** event text is cut to 500 characters, and session ids must be short and plain.
+- **Per-run limits** in `beforeTurn()`: effort `low`, at most 1,024 output tokens, at most 4 tool rounds.
+- **No key, no cost:** without the secret, the page runs on the scripted model.
+
+Deploy with `npx wrangler deploy` (live demo: https://always-on-agent.shopdawg.workers.dev). Set a spend limit on the Anthropic key you use for the
+demo as a final backstop.
+
+## Deploy safety: add steps, don't rename them
+
+Workflow step names are cache keys. When a paused instance resumes on new code, every
+step whose name it has already finished returns its saved result and does not run again.
+
+`ReleaseWorkflow` runs `collect-changes`, then `draft-notes` (a model call), then waits for
+approval, then `publish`. The demo starts a run on v1, lets it pause at the approval,
+restarts the dev server as a new version, approves, and prints every step that really ran:
+
+```
+v2-add:    collect-changes@v1, draft-notes@v1, notify-team@v2-add, publish@v2-add
+           ✓ the new step ran; finished steps were not re-run
+
+v2-rename: collect-changes@v1, draft-notes@v1, draft-release-notes@v2-rename, publish@v2-rename
+           ✗ the renamed step got a new cache key, so it ran again (a second model call)
+```
+
+The version is set with `RELEASE_VERSION` so one file can show all three versions. In
+real code, v2 would be a code change and a `wrangler deploy`.
+
+## Watching it
+
+Two views, linked by one id: the browser's session id is also the agent's name and the
+PostHog distinct id.
+
+**Cloudflare traces and logs**, in `wrangler.jsonc` (`observability.traces.enabled`,
+everything sampled). With no extra code, Think emits an `invoke_agent Assistant` span per
+run, `chat <model>` per model call and `execute_tool <name>` per tool. The Durable Object
+storage, alarm, Workflow and outbound `fetch` spans sit around them. Deployed runs show
+up in the dashboard's Agents view and in Workers Observability. Locally, `wrangler dev`
+keeps the same traces in its Local Explorer.
+
+**PostHog**, off until you set a project token (`src/telemetry.ts`, plain `fetch`, no SDK):
+
+| What | Event | Source |
+|---|---|---|
+| Traffic and session replay | `$pageview`, `$pageleave`, replays | `posthog-js` on the page |
+| Every model call | `$ai_generation`: model, tokens, latency, stop reason, tool calls, trace id per run, session id per browser | Think `onStepEnd` hook |
+| Errors | `$exception` | page errors, Worker route errors, failed agent turns (`onChatError`), outbox delivery failures |
+| Flow steps | `event_received` (with `duplicate`), `approval_decided`, `release_started` | the agent |
+
+```bash
+npx wrangler secret put POSTHOG_KEY      # your project token, phc_...
+```
+
+EU projects: set `POSTHOG_HOST` in `wrangler.jsonc` to `https://eu.i.posthog.com`. The
+page tells visitors that usage is recorded.
+
+## Layout
+
+```
+src/index.ts             Worker: HTTP front door, routes to the user's agent
+src/agent.ts             Assistant (Think): actions, inbox, outbox, approvals
+src/release-workflow.ts  ReleaseWorkflow (ThinkWorkflow): deploy-safety demo
+src/mock-model.ts        scripted model for keyless runs
+src/telemetry.ts         PostHog capture (LLM generations, errors)
+public/index.html        one-page UI
+scripts/demo.mjs         end-to-end demo and checks
+```
+
+## Notes
+
+- **Not production-hardened.** The routes have no auth, only the rate limit. Anyone can
+  approve their own (fake) refunds. Real use needs Cloudflare Access or a signed-webhook check.
+- Think is marked experimental in Cloudflare's docs, and its API is still moving. The
+  package versions are pinned in `package.json`.
+- A Workflow paused in `waitForEvent` can report `running` rather than `waiting` (seen
+  both locally and deployed), so the demo and page treat "pre-approval steps done" as paused.
+- `just-bash` is installed only because the `agents` package imports it when bundling.
+
+## Sources
+
+The idea, and every project this demo is built on.
+
+- [Building always-on agents](https://claude.com/resources/articles/building-always-on-agents), Anthropic: the pattern this repo follows
+- [Claude models](https://platform.claude.com/docs/en/about-claude/models/overview): Claude Haiku 5.5 does the thinking
+- [cloudflare/agents](https://github.com/cloudflare/agents): the Agents SDK and the [Think](https://developers.cloudflare.com/agents/harnesses/think/) harness
+- [cloudflare/computer](https://github.com/cloudflare/computer): the workspace Think uses
+- [cloudflare/workers-sdk](https://github.com/cloudflare/workers-sdk): Wrangler, for local dev and deploys
+- Cloudflare docs: [Workers](https://developers.cloudflare.com/workers/), [Durable Objects](https://developers.cloudflare.com/durable-objects/), [Workflows](https://developers.cloudflare.com/workflows/), [Rate Limiting](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/), [Traces](https://developers.cloudflare.com/workers/observability/traces/)
+- [vercel/ai](https://github.com/vercel/ai): the AI SDK and its Anthropic provider
+- [colinhacks/zod](https://github.com/colinhacks/zod): tool input schemas
+- [vercel-labs/just-bash](https://github.com/vercel-labs/just-bash): required by the Agents SDK bundle
+- [PostHog/posthog-js](https://github.com/PostHog/posthog-js) and [PostHog LLM analytics](https://posthog.com/docs/llm-analytics): usage, replays and errors
+- Type: [Atkinson Hyperlegible Next](https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next) and [Big Shoulders Stencil](https://fonts.google.com/specimen/Big+Shoulders+Stencil)

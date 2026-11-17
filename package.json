@@ -1,0 +1,25 @@
+{
+  "name": "always-on-agent-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "typecheck": "wrangler types --strict-vars=false && tsc --noEmit",
+    "demo": "node scripts/demo.mjs",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.105",
+    "@cloudflare/computer": "^0.8.0",
+    "@cloudflare/think": "^0.23.0",
+    "agents": "^0.33.0",
+    "ai": "^7.0.173",
+    "just-bash": "^3.6.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261117.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.164.0"
+  }
+}

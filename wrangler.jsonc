@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "always-on-agent",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-17",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // One Think agent (a SQLite-backed Durable Object) per user/conversation.
+  "durable_objects": {
+    "bindings": [{ "name": "Assistant", "class_name": "Assistant" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Assistant"] }],
+
+  // Long multi-step job used by the deploy-safety demo.
+  "workflows": [
+    {
+      "name": "release-workflow",
+      "binding": "RELEASE_WORKFLOW",
+      "class_name": "ReleaseWorkflow"
+    }
+  ],
+
+  "vars": {
+    // Claude Haiku 5.5 runs when the ANTHROPIC_API_KEY secret is set; otherwise a free
+    // scripted model. Set "mock" to force the scripted model even with a key.
+    // Key: npx wrangler secret put ANTHROPIC_API_KEY (or .dev.vars locally).
+    "MODEL_MODE": "auto",
+    // Which version of ReleaseWorkflow is "deployed": v1 | v2-add | v2-rename
+    "RELEASE_VERSION": "v1",
+    // Optional: POST outbox messages here instead of logging them.
+    "OUTBOX_WEBHOOK_URL": "",
+    // PostHog (traffic, session replay, LLM analytics, errors). Off until the project
+    // token is set: npx wrangler secret put POSTHOG_KEY  (or POSTHOG_KEY in .dev.vars).
+    // EU projects: https://eu.i.posthog.com
+    "POSTHOG_HOST": "https://us.i.posthog.com"
+  },
+
+  // Static one-page UI. API paths go to the Worker first.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/config", "/events/*", "/status/*", "/approvals/*", "/releases/*", "/agents/*"]
+  },
+
+  // Public demo: cap how fast one IP can wake the model.
+  "ratelimits": [
+    { "name": "EVENT_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }
+  ],
+
+  // Workers Observability (Cloudflare tracing). Traces need their own flag; Think emits
+  // invoke_agent, chat <model> and execute_tool <name> spans when it is on, alongside the
+  // Worker, Durable Object, alarm and Workflow spans. Sample everything: traffic is small.
+  "observability": {
+    "traces": { "enabled": true, "head_sampling_rate": 1 },
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": true }
+  }
+}
